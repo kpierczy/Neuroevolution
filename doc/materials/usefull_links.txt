@@ -1,7 +1,7 @@
 About neuroevolution:
-
-https://www.nature.com/articles/s42256-018-0006-z
+https://www.nature.com/articles/s42256-018-0006-z (broad coverage on neuroevolution)
 
 Potentially usefull tools:
 https://github.com/DEAP/deap (evolution algorithms framework)
 https://analyticsindiamag.com/top-7-python-neural-network-libraries-for-developers/ (neural nets frameworks)
+https://github.com/kpierczy/DeeperHistoricalKnowledge (my implmentation of \mu + \lambda algorithm)
