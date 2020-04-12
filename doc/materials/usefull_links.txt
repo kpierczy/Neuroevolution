@@ -1,0 +1,7 @@
+About neuroevolution:
+
+https://www.nature.com/articles/s42256-018-0006-z
+
+Potentially usefull tools:
+https://github.com/DEAP/deap (evolution algorithms framework)
+https://analyticsindiamag.com/top-7-python-neural-network-libraries-for-developers/ (neural nets frameworks)
