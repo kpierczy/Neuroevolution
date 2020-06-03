@@ -1,7 +1,7 @@
 import numpy as np
 from collections import deque
 from tensorflow import keras
-
+import random
 
 class DQNAgent:
     """
@@ -39,7 +39,7 @@ class DQNAgent:
     """
     def __init__(self, statesNum, actionsNum, memSize=2000,
                 gamma=0.95, gammaRise=1, gammaMax=0.95,
-                epsilon=1, epsilonDecay=0.995, epsilonMin=0.01):
+                epsilon=1.0, epsilonDecay=0.995, epsilonMin=0.01):
 
         # Size of the net's input and output
         self.statesNum = statesNum
@@ -64,9 +64,6 @@ class DQNAgent:
         self.epsilonDecay = 0.995
         self.epsilonMin = 0.01
 
-        # SGD learning rate
-        self.learningRate = learningRate
-
         # Internal model
         self.__model = False
     
@@ -76,9 +73,9 @@ class DQNAgent:
     """
     (Re)Initialize internal model with given parameters.
 
-    @param layers : stack of the Keras internal layers
-    @param loss function : Keras loss function object
-    @param optimizer : Keras optimizer object
+    @param layers : list of the Keras internal layers
+    @param loss function : Keras loss function
+    @param optimizer : Keras optimizer
     @param reinitialize : if True object will be reinitialized
 
     @returns : true if model was (re)initialized, false otherwise
@@ -86,12 +83,25 @@ class DQNAgent:
     """
     def initialize(self, layers, lossFunction, optimizer, reinitialize=False):
         
-        if not (self.__model) or (reinitialize)
+        if not (self.__model) or (reinitialize):
+            
+            # Declare model's input shape
             inputs = keras.Input(shape=(self.statesNum))
-            outputs = keras.layers.Dense(self.actionsNum, activation='linear')(layers)
+
+            # Stack internal layers
+            layerStack = layers[0](inputs)
+            for layerNum in range(1, len(layers)):
+                layerStack = layers[layerNum](layerStack)
+
+            # Declare model's output
+            outputs = keras.layers.Dense(self.actionsNum, activation='linear')(layerStack)
+
+            # Create and compile model
             self.__model = keras.Model(inputs=inputs, outputs=outputs)
             self.__model.compile(loss=lossFunction, optimizer=optimizer)
+
             return True
+            
         else:
             return False
 
@@ -124,10 +134,11 @@ class DQNAgent:
     
         # Decide to act randomly or not
         if np.random.rand() <= self.epsilon:
-            return random.randrange(self.action_size)
+            return random.randrange(self.actionsNum)
         else:
-            act_values = self.model(state)
-            return np.argmax(act_values[0])
+
+            actValues = self.__model(state.reshape((1, 1, self.statesNum))).numpy()
+            return np.argmax(actValues[0])
 
 
 
@@ -142,39 +153,43 @@ class DQNAgent:
     """
     def learn(self, batchSize, iterations):
 
-        for _ in range(iterations)
+        for _ in range(iterations):
 
             # Sample records for the batch
             samples = random.sample(self.memory, batchSize)
 
             # Prepare batch
-            batch_input  = np.zeros((batchSize, self.actionsNum))
-            batch_output = np.zeros((batchSize, self.statesNum))
+            batchInput  = np.zeros((batchSize, 1, self.statesNum))
+            batchOutput = np.zeros((batchSize, 1, self.actionsNum))
             record = 0
-            for state, action, reward, next_state, done in samples:
+            for state, action, reward, nextState, done in samples:
                 
+                # Reshape states to the Keras requirements
+                state = state.reshape((1, 1, self.statesNum))
+                nextState = nextState.reshape((1, 1, self.statesNum))
+
                 # If done, target reward is the historical reward
-                target_reward = reward
+                targetReward = reward
                 # Otherwise compute target as the sum of historical
                 # reward and weighted future estimation
                 if not done:
-                    target_reward = (reward + self.gamma * np.amax(self.model.predict(next_state)[0])) 
+                    targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
 
-                target = self.model.predict(state)
-                target[0][action] = target
+                target = self.__model(state).numpy()
+                target[0][0][action] = targetReward
 
                 # Save target to the batch
-                batch_input[record] = state
-                batch_output[record] = target
+                batchInput[record] = state[0]
+                batchOutput[record] = target[0]
 
-            self.model.fit(batch_input, batch_output, epochs=1, verbose=0)
+            self.__model.fit(batchInput, batchOutput, epochs=1, verbose=0)
 
         # Update epsilon
-        if self.epsilon > self.epsilonMin:
+        if self.epsilon * self.epsilonDecay >= self.epsilonMin:
             self.epsilon *= self.epsilonDecay
 
         # Update discount rate
-        if self.gamma * self.epsilonDecay < self.gammaMax:
+        if self.gamma * self.epsilonDecay <= self.gammaMax:
             self.gamma *= self.gammaRise
 
 
@@ -187,7 +202,7 @@ class DQNAgent:
 
     """
     def load(self, name):
-        self.model.load_model(name)
+        self.__model.load_model(name)
 
     """
     Saves model to the file
@@ -196,4 +211,4 @@ class DQNAgent:
     
     """
     def save(self, name):
-        self.model.save(name)
+        self.__model.save(name)
