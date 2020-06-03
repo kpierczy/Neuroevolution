@@ -1,0 +1,25 @@
+\begin{thebibliography}{1}
+
+\bibitem{bellman}
+R.~Bellman.
+\newblock \textit{On the Theory of Dynamic Programming}.
+\newblock 1952.
+
+\bibitem{backprop}
+Ronald J.~Williams David E.~Rumelhart, Geoffrey E.~Hinton.
+\newblock \textit{Learning representations by back-propagating errors}.
+\newblock 1986.
+
+\bibitem{live-lessons}
+John Krohn.
+\newblock Cartpole dqn.
+\newblock
+  \url{https://github.com/the-deep-learners/TensorFlow-LiveLessons/blob/master/notebooks/cartpole_dqn.ipynb}.
+
+\bibitem{perceptron}
+F.~Rosenblatt.
+\newblock \textit{The Perceptron: A Probabilistic Model For Information Storage
+  And Organization In The Brain}.
+\newblock 1958.
+
+\end{thebibliography}

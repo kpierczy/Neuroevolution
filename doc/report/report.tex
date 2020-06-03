@@ -1,0 +1,160 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Header %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[a4paper,titlepage,11pt,twosides,floatssmall]{mwrep}
+
+\usepackage[left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry} % Pages' geometry and layout
+\usepackage{amsmath} % Mathematical commands
+\usepackage{amsfonts} % Fonts commands
+\usepackage{amssymb} % Symbolical commands
+\usepackage[T1]{fontenc} % Defines encoding for fonts (OT1 - original TeX encoding) 
+\usepackage[polish]{babel} % Polish language specifics
+\usepackage{graphicx} % Importing external graphics
+\usepackage{float} % Forcing plot's position
+\usepackage{url} % Web-related text (urls, mail adresses, etc.)
+\usepackage{tikz} % Creating graphical elements like lines, dots, curves, figures
+\usepackage{rotating} % Rotating objects of an arbitrary angle
+\usepackage[percent]{overpic} % Makes it able to put LaTeX commands onto the included graphics (with a dedicated environment)
+\usepackage[utf8]{inputenc} % Non-standrard encoding of the LaTeX files
+\usepackage{xcolor} % Easy driver-independent access to several kinds of color tints, shades, tones, and mixes of arbitrary colors
+\usepackage{pgfplots} % High-quality function plots in normal or logarithmic scaling with a user-friendly interface
+\usepackage{listings} % Source code printer
+\usepackage{matlab-prettifier} % Matlab source code printer
+\usepackage{enumitem} % List environments
+\usepackage{siunitx} % Physical units
+\usepackage{float} % force figure anchoring
+\usepackage[nottoc]{tocbibind}
+
+% tikz packages choice
+\usetikzlibrary{arrows,calc,decorations.markings,math,arrows.meta}
+\usetikzlibrary{pgfplots.groupplots}
+
+% siunitx settings
+\sisetup{detect-weight,exponent-product=\cdot,output-decimal-marker={,},per-mode=symbol,binary-units=true,range-phrase={-},range-units=single}
+\SendSettingsToPgf % unifies settings of the pgfplots package with siunitx package
+
+% listings settings
+\definecolor{gray}{rgb}{0.95,0.95,0.95}
+\lstset{
+	backgroundcolor=\color{gray},
+	frame=single,
+	breaklines=true,
+}
+
+% listings styles
+\lstdefinestyle{customlatex}{
+	basicstyle=\footnotesize\ttfamily,
+	% basicstyle=\small\ttfamily,
+}
+\lstdefinestyle{customc}{
+	breaklines=true,
+	frame=tb,
+	language=C,
+	xleftmargin=0pt,
+	showstringspaces=false,
+	basicstyle=\small\ttfamily,
+	keywordstyle=\bfseries\color{green!40!black},
+	commentstyle=\itshape\color{purple!40!black},
+	identifierstyle=\color{blue},
+	stringstyle=\color{orange},
+}
+\lstdefinestyle{custommatlab}{
+	captionpos=t,
+	breaklines=true,
+	frame=tb,
+	xleftmargin=0pt,
+	language=matlab,
+	showstringspaces=false,
+	% basicstyle=\footnotesize\ttfamily,
+	basicstyle=\scriptsize\ttfamily,
+	keywordstyle=\bfseries\color{green!40!black},
+	commentstyle=\itshape\color{purple!40!black},
+	identifierstyle=\color{blue},
+	stringstyle=\color{orange},
+}
+
+% Text field size (without header and footer - bez "¿ywej paginy")
+\textwidth 160mm \textheight 247mm
+
+% pgfplots settings
+\pgfplotsset{
+	tick label style={font=\scriptsize},
+	label style={font=\small},
+	legend style={font=\small},
+	title style={font=\small}
+}
+
+\addto\captionspolish{\renewcommand{\figurename}{Rys.}}
+\addto\captionspolish{\renewcommand{\tablename}{Tab.}}
+
+% Max number of floating elements configuration
+\setcounter{topnumber}{0} % default : 2
+\setcounter{bottomnumber}{3} % default : 1
+\setcounter{totalnumber}{5} % default : 3
+
+\renewcommand{\textfraction}{0.01} % default : 0.2
+\renewcommand{\topfraction}{0.95} % default : 0.7
+\renewcommand{\bottomfraction}{0.95} % default : 0.3
+\renewcommand{\floatpagefraction}{0.35} % default : 0.5
+
+% Path to the graphics
+\graphicspath{ {./img/} }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Document utilities %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Title Page Data
+\title{\bf Neuroewolucja - gra w gre \vskip 0.1cm}
+\author{Kacper Kula, Krzysztof Pierczyk}
+\date{czerwiec 2020}
+
+% Maketitle macro
+\makeatletter
+\renewcommand{\maketitle}
+{
+	\begin{titlepage}
+		\begin{center}{
+			\LARGE {\bf
+			Wydział Elektroniki i Technik Informacyjnych}}\\
+			\vspace{0.4cm}
+			{\LARGE {\bf Politechnika Warszawska}}\\
+			\vspace{0.3cm}
+		\end{center}
+		\vspace{5cm}
+		\begin{center}
+            {\bf \LARGE Algorytmy Heurystyczne \vskip 0.1cm}
+            {\bf \LARGE \@title}
+		\end{center}
+		\vspace*{\stretch{6}}
+        \begin{center}
+            {\bf \Large \@author \par}
+			\bf{\large{Warszawa, \@date\vskip 0.1cm}}
+		\end{center}
+	\end{titlepage}
+}
+\makeatother
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Document %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+% Pages' style formatting
+\frenchspacing
+\pagestyle{uheadings}
+
+% Use maketitle macro to build title page
+\maketitle
+
+% Insert parts of the report
+\tableofcontents
+\input{intro}
+\input{q_learning}
+
+\bibliography{bibliography}
+\bibliographystyle{plain}
+
+\end{document}

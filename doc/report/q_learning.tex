@@ -1,0 +1,97 @@
+\chapter{Podejście klasyczne}
+
+Aby wyznaczyć punkt odniesienia dla badań związanych z~neuroewolucją rozpoczęliśmy od uczenia naszej sieci metodą wstecznej propagacji błędu. Pomysł na wykorzystanie jej w~uczeniu ze wzmocnieniem nie przychodzi w~tak oczywisty sposób jak w~przypadku uczeni nadzorowanego. Z~tego wzlędu postanowiliśmy przyjrzeć się głębiej naturze samego problemu.
+
+\section*{Uczenie ze wzmocnieniem}
+
+Uczenie ze wzmocnieniem (ang. \textit{Reinforcement Learning, RL})jest to dziedzina uczenia maszynowego zajmująca się metodami wyznaczania optymalnej strategii zachowania agenta w~nieznanym mu środowisku. Celem agenta jest maksymalizacja nagrody otrzymywanej za interakcję ze środowiskiem. środowisko modeluje się najczęciej jako proces decyzyjny Markova (ang. \textit{Markov decission process, MDP}), który można przedstawić jako krotkę podstaci
+
+\begin{equation}
+    <S,A,P_a(s, s'),R_a(s, s'),O>
+\end{equation}
+
+gdzie $S$ - zbiór wszystkich stanów agenta i~środowiska, $A$ - zbiór akcji możlwiwych do podjęcia przez agenta, $P_a(s, s')$ - prawdopodobieństwo przejścia ze stanu $s$ do stanu $s'$ pod wplywem akcji $a$, $R_a(s, s')$ - natychmiastowa nagroda przy przejściu ze stanu $s$ do stanu $s'$ pod wpływem akcji $a$, $O$ -  zasady opisujące obserwacje agenta. Agent oddziałuje z~otoczeniem w~dyskretnych chwilach. W~każdej chwili $t$ otrzymuje on obserację $o_t$ i~nagrodę $r_t$ (zazwyczaj w~postaci wartości skalarnej) oraz decyduje się na podjęcie akcji $a_t$. Proces ten został poglądowo przedstawiony na \figurename\ref{reinforcement-learning}
+
+\vskip 0.5cm
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.3]{reinforcement_learning_loop.png}
+    \caption{Typowy schemat interakcji agenta ze środowiskiem}
+    \label{reinforcement-learning}
+\end{figure}
+\vskip 0.5cm
+
+Model podejmowania decyzji przez agenta nazywa się polityką (ang. \textit{policy}) i~można go przedstawić w~podstaci \ref{policy}. Polityka określa prawdopodobieństwo podjęcia przez agenta akcji $a$ w~stanie $s$.
+
+\vskip 0.5cm
+\begin{equation}
+\begin{cases}
+    \pi: A \times S \rightarrow [0,1] \\
+    \pi(a,s) = P\left\{a_t = a | s_t = s\right\} 
+    \label{policy}
+\end{cases}
+\end{equation}
+\vskip 0.5cm
+
+Aby ocenić jakość stanu agent dysponuje funkcją wartości stanu (ang. \textit{state-value function}) postaci widocznej na \ref{state-value-function}, gdzie $\gamma$ jest skalarem z przedziału $[0, 1]$. Zwraca ona wartość oczekiwaną sumy przyszłych nagród wziętych z~odpowiednimi wspóczynnikami oznaczaną przez $R$.
+
+\vskip 0.5cm
+\begin{equation}
+    V_{\pi}(s) = E\left[\sum_{t=0}^{\infty} \gamma^tr_t | s_0=s\right] = E\left[R|s=s_0\right]
+    \label{state-value-function}
+\end{equation}
+\vskip 0.5cm
+
+Funkcja wartości polityki(ang. \textit{value function}) jest z~kolei metodą określenia jakości całego mechanizmu decyzyjnego. Analogicznie do funkcji wartości stanu jest ona zdefiniowana jako wartość oczekiwana ważonej sumy przyszłych nagród dla stanu $s$ przy wykorzystaniu polityki $\pi$. Ukazano ją na \ref{policy-value-function}.
+
+\vskip 0.5cm
+\begin{equation}
+    V^{\pi}(s) = E\left[R|s, \pi\right]
+    \label{policy-value-function}
+\end{equation}
+\vskip 0.5cm
+
+Definicja ta pozwala nam zdefiniować optymalną politykę jako tę, która maksymalizuje swoją wartość $V^{\pi}$ niezależnie od wybranego stanu $s$. Chociaż definicja ta jest wystarczająca, często definiuje się dodatkowy element nazywany funkcją wartości akcji (ang. \textit{action-values function}). Jest ona postaci \ref{action-values-function} i~określa oczekiwaną wartość ważonej sumy przyszłych nagród w~sytuacji, w~której agent, znajdując sie w~stanie $s$ wykonał akcję $a$, a~następnie działał zgodnie z polityką$\pi$.
+
+\vskip 0.5cm
+\begin{equation}
+    Q^{\pi}(s,a) = E[R|s, a, \pi]
+    \label{action-values-function}
+\end{equation}
+\vskip 0.5cm
+
+Algorytmy uczenia ze wzmocnieniem są budowane na dwa sposoby. Pierwszy to bezpośrednia próba odnalezienia polityka $\pi(s)$, czyli modelu, który widząc na wejściu stan $s$ zwraca optymalną akcję $a$. Drugie podejście modeluje nie samą politykę, a~funkcję $Q^{\pi}(s, a)$. Z~definicji tej funkcji wynika, że jeżeli ${\pi}^*$ jest polityką optymalną, to agent moze postępować optymalnie poprzez wybieranie tej akcji ze zbioru ${Q^{\pi^*}(s, a) : a \in A}$, której wartość jest największa - nie wymaga od nas znajomości samej polityki $\pi^*$. To na pozór trywialne spostrzeżenie, zwane \textit{równaniem Bellmana}\cite{bellman} pozwala na budowę efektywnych algorytmów uczenia, których przykładem jest wybrany przez nas \textit{Deep Q Network} (DQN). 
+
+
+\section*{Deep Q Network}
+
+Q-learning jest algorytmem uczenia ze wzmocnieniem bazującym na estymacji funkcji $Q(s,a)$ (stąd nazwa). Estymowana funkcja pozwala agentowi podejmować suboptymalne decyzje poprzez wybór tej z~nich, która maksymalizuje jej wartość. Wartości $Q$ są aktualizowane wraz z kolejnymi obserwacjami. Wzór na aktualizację bazuje na równaniu Bellmana i ma postać \ref{q-learning}
+
+\vskip 0.5cm
+\begin{equation}
+    Q^{t+1}(s_t, a_t) = Q^{t}(s_t, a_t) + \alpha \times \left[r_t + \gamma \times \max_a Q^{t}(s_{t+1}, a_{t+1}) - Q(s_t, a_t)\right]
+    \label{q-learning}
+\end{equation}
+\vskip 0.5cm
+
+Sieć aproksymująca posiada liczbę wejść równą liczbie zmiennych opisujących stan układu, natomiast liczb wyjść jest równa liczbie możliwych do podjęcia przez agenta akcji. Każde z~wyjść opisuje zatem wartość jednej z~tych akcji w~stanie podanym na wejściu. Stosując równanie \ref{q-learning} do takiej sieci uzyskujemy funkcję błędu postaci \ref{cost-function}
+
+\vskip 0.5cm
+\begin{equation}
+    c(s) = E\left[\|(r_{t} + \gamma \times \max_{a_{t+1}}Q^{t}(s_{t+1},a_{t+1}))-Q^{t}(s,a)\|\right]
+    \label{cost-function}
+\end{equation}
+\vskip 0.5cm
+
+\section*{Implementacja}
+
+Implementacja DQN została w~dużej części zaczerpnięta z~\cite{live-lessons}. Jak już wcześniej wspomniano, poligonem testowym była dla nas gra Breakout, jednak sam program został stworzony tak, aby umożliwić wykorzystanie dowolnego środowiska udostepnianego przez \textit{OpenAI Gym}. Agent jest inicjalizowany losowymi wagami. W~kolejnych iteracjach wykonuje on akcje, dla których przewidywana wartość skumulowanej nagrody jest największa. Korelacja między kolejnymi obserwacjami może sprawić, że sieć będzie niestabilna. Aby temu zapobiec krotki postaci \ref{learning-data-dqn}
+
+\vskip 0.5cm
+\begin{equation}
+    <s_t, a_t, r_t, s_{t+1}>
+    \label{learning-data-dqn}
+\end{equation}
+\vskip 0.5cm
+
+są zapisywane w~dedykowanej tablicy. Po zakończeniu podejścia do gry zostaną one wykorzystane w~procesie uczenia. Zmniejszenie korelacji następuje poprzez losowy wybór próbek z~zapisanego zbioru. Ilość próbek wykorzystana w~pojedynczej iteracji STG (ang. \textit{Stochastic Gradient Descend}) jest jednym z~parametrów algorytmu. Obszar pamięci, w~którym zapisywane są dane uczące stanowi kolejkę o~ograniczonej pojemności. Jeżeli się ona przepeni, to nowe dane wstawiane są na początku kolejki, natomiast najstarsze dane zostją usunięte. Aby kontrolować tendencje algorytmu do eksplorowania przestrzeni wprowadzony został również parametr $\epsilon \in [0,1]$. Gdy ma on niezerową wartość istnieje szansa, że agent wykona losową akcję zamiast tej przewidzianej przez sieć. Parametr ten jest inicjalizowany niezerową wartością i~zmniejszany wraz przebiegiem uczenia.
