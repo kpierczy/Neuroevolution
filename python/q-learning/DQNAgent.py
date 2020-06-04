@@ -137,7 +137,7 @@ class DQNAgent:
             return random.randrange(self.actionsNum)
         else:
 
-            actValues = self.__model(state.reshape((1, 1, self.statesNum))).numpy()
+            actValues = self.__model(state.reshape((1, self.statesNum))).numpy()
             return np.argmax(actValues[0])
 
 
@@ -159,14 +159,14 @@ class DQNAgent:
             samples = random.sample(self.memory, batchSize)
 
             # Prepare batch
-            batchInput  = np.zeros((batchSize, 1, self.statesNum))
-            batchOutput = np.zeros((batchSize, 1, self.actionsNum))
+            batchInput  = np.zeros((batchSize, self.statesNum))
+            batchOutput = np.zeros((batchSize, self.actionsNum))
             record = 0
             for state, action, reward, nextState, done in samples:
                 
                 # Reshape states to the Keras requirements
-                state = state.reshape((1, 1, self.statesNum))
-                nextState = nextState.reshape((1, 1, self.statesNum))
+                state = state.reshape((1, self.statesNum))
+                nextState = nextState.reshape((1, self.statesNum))
 
                 # If done, target reward is the historical reward
                 targetReward = reward
@@ -176,7 +176,7 @@ class DQNAgent:
                     targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
 
                 target = self.__model(state).numpy()
-                target[0][0][action] = targetReward
+                target[0][action] = targetReward
 
                 # Save target to the batch
                 batchInput[record] = state[0]
