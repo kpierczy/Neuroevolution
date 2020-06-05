@@ -20,10 +20,11 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 env = gym.make('Breakout-ram-v0')
 # Directory for model's saves
 modelsDir = 'python/q-learning/models/'
+# Model to load (optional: False -> create new model)
+modelPath = 'python/q-learning/models/final'
 # Name of the final model save
 finalName = 'final'
-# Model to load (optional: False -> create new model)
-modelPath = False
+
 
 # Observation space wrapper (optional: False -> no wrapper)
 observationWrapper = False
@@ -90,7 +91,7 @@ if not modelPath:
 # ... or load the old one for futher learning
 else:
     agent = DQNAgent(env.observation_space.shape[0], env.action_space.n)
-    agent.load(modelName)
+    agent.load(modelPath)
 
 # Create folder for the models
 modelsDir = os.path.join(modelsDir, env.unwrapped.spec.id)
