@@ -13,7 +13,7 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 # Training environment
-env = gym.make('CartPole-v0')
+env = gym.make('CartPole-v1')
 # Directory for model's saves
 modelsDir = 'python/q-learning/models/'
 
@@ -37,8 +37,8 @@ epsilonDecay = 0.995
 epsilonMin   = 0.01
 
 # Learning parameters
-batchSize  = 1
-iterations = 32
+batchSize  = 8
+iterations = 8
 
 learningRate = 1e-3
 optimiser  = keras.optimizers.Adam(learning_rate=learningRate)
@@ -46,12 +46,15 @@ loss       = 'mse'
 
 # Model's internal layers
 layerStack = (
-    keras.layers.Dense(24, activation='relu'),
-    keras.layers.Dense(24, activation='relu')
+    keras.layers.Dense(36, activation='relu'),
+    keras.layers.Dense(36, activation='relu')
 )
 
 # Score threshold for model's save
-threshold = 500
+threshold = 400
+
+# Display training simulations
+display = False
 
 
 #------------------------------------------------------------------#
@@ -81,6 +84,10 @@ for gameNum in range(gamesNum):
     score = 0
     for _ in range(gamesLengthMax):
 
+        # Display render
+        if display:
+            env.render()
+
         # Interact with environment
         action = agent.act(state)
         nextState, reward, done, _ = env.step(action)
@@ -102,11 +109,11 @@ for gameNum in range(gamesNum):
             print("Episode: {}/{}, Score: {}, epsilon: {:.2}".format(gameNum + 1, gamesNum, score - penalty, agent.epsilon))
             break
 
+    # Save model
+    if score >= threshold:
+        agent.save(modelsDir + 'score_{}'.format(score - penalty))
+
     # Teach model
     if len(agent.memory) > batchSize:
         agent.learn(batchSize, iterations)
-
-    # Save model
-    if score >= threshold:
-        agent.save(modelsDir + 'score_{}'.format(score))
     

@@ -202,7 +202,7 @@ class DQNAgent:
 
     """
     def load(self, name):
-        self.__model.load_model(name)
+        self.__model = keras.models.load_model(name)
 
     """
     Saves model to the file
