@@ -1,4 +1,5 @@
 import numpy as np
+from random import shuffle
 from collections import deque
 from tensorflow import keras
 import random
@@ -8,6 +9,11 @@ class DQNAgent:
     DQN (Deep Q Network) agent class utilizing Keras programming model.
     Model implement's DeepMind-like RL algorithm sharing simple learning
     and usage interface.
+
+    This class was inspired by the John Krohn. Original scetch can be 
+    found under:
+        https://github.com/the-deep-learners/TensorFlow-LiveLessons/blob/master/notebooks/cartpole_dqn.ipynb
+        
     """
 
 
@@ -19,7 +25,7 @@ class DQNAgent:
     @note : constructor doesn't create internal neural net model. 
             To do this one has to call initialize() method
 
-    @param statesNum : number of the states agent can observe
+    @param stateShape : shape of the single state
     @param actionsNum : number of the actions agent can take
     @param memSize : size of the internal buffor containing
         historical data used during training
@@ -37,12 +43,12 @@ class DQNAgent:
     @param epsilonMin : minimum value of the epsilon
 
     """
-    def __init__(self, statesNum, actionsNum, memSize=2000,
+    def __init__(self, stateShape, actionsNum, memSize=2000,
                 gamma=0.95, gammaRise=1, gammaMax=0.95,
                 epsilon=1.0, epsilonDecay=0.995, epsilonMin=0.01):
 
         # Size of the net's input and output
-        self.statesNum = statesNum
+        self.stateShape = stateShape
         self.actionsNum = actionsNum
 
         # Double-ended queue that stores <s_t, a_t, r_t, s_{t+1}> touples registered
@@ -71,22 +77,22 @@ class DQNAgent:
 
 
     """
-    (Re)Initialize internal model with given parameters.
+    (Re)Initializes internal model with given parameters.
 
     @param layers : list of the Keras internal layers
-    @param loss function : Keras loss function
-    @param optimizer : Keras optimizer
+    @param loss function : Keras loss function (string or object)
+    @param optimizer : Keras optimizer object
     @param reinitialize : if True object will be reinitialized
 
     @returns : true if model was (re)initialized, false otherwise
 
     """
-    def initialize(self, layers, lossFunction, optimizer, reinitialize=False):
+    def createModel(self, layers, lossFunction, optimizer, reinitialize=False):
         
         if not (self.__model) or (reinitialize):
             
             # Declare model's input shape
-            inputs = keras.Input(shape=(self.statesNum))
+            inputs = keras.Input(shape=self.stateShape)
 
             # Stack internal layers
             layerStack = layers[0](inputs)
@@ -137,7 +143,9 @@ class DQNAgent:
             return random.randrange(self.actionsNum)
         else:
 
-            actValues = self.__model(state.reshape((1, self.statesNum))).numpy()
+            actValues = self.__model(
+                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0))
+            ).numpy()
             return np.argmax(actValues[0])
 
 
@@ -145,44 +153,67 @@ class DQNAgent:
 
     """
     Performs a number of learning batches basing of the historical
-    data. Records are sampled randomly from the saved records.
+    data. Transitions are sampled randomly from the saved transitions.
 
-    @param batchSize : size of the batch
-    @param iterations : number of batches
+    @param mode : string, determines type of the learning process
+        'classic' - batches are taken from the ordered array
+            containing saved transition
+        'random' - batches are taken from the shuffled array
+            constaining saved transitions
+    @param batchSize : size of the single batch, if set of the saved
+        transitions is not divisible by the batch size, the last batch
+        is taken from remaining samples
+    @param iterations : number of batches to complete an epoch
+    @param epochs : number of epochs
+
+    @note : if batchSize times iterations is greater than number of the
+            saved transitions number of samples is trimmed to this number
 
     """
-    def learn(self, batchSize, iterations):
+    def learn(self, mode='classic', batchSize=1, iterations=1, epochs=1):
+        
+        # Prepare training data set
+        if mode == 'classic':
+            data = self.memory
+        elif mode =='random':
+            data = self.memory.copy()
+            shuffle(data)
 
-        for _ in range(iterations):
+        # Initialize training data
+        if batchSize * iterations < len(self.memory):
+            dataLen = batchSize * iterations
+        else:
+            dataLen = len(self.memory)
+        trainingInput  = np.zeros(np.concatenate((np.array([dataLen]),             self.stateShape), axis=0))
+        trainingOutput = np.zeros(np.concatenate((np.array([dataLen]), np.array([self.actionsNum])), axis=0))
 
-            # Sample records for the batch
-            samples = random.sample(self.memory, batchSize)
+        # Fill batch arrays
+        batchSamplesNum = 0
+        for dataIdx in reversed(range(0, dataLen)):
 
-            # Prepare batch
-            batchInput  = np.zeros((batchSize, self.statesNum))
-            batchOutput = np.zeros((batchSize, self.actionsNum))
-            record = 0
-            for state, action, reward, nextState, done in samples:
-                
-                # Reshape states to the Keras requirements
-                state = state.reshape((1, self.statesNum))
-                nextState = nextState.reshape((1, self.statesNum))
+            # Unpack transition data
+            state, action, reward, nextState, done = data[dataIdx]
 
-                # If done, target reward is the historical reward
-                targetReward = reward
-                # Otherwise compute target as the sum of historical
-                # reward and weighted future estimation
-                if not done:
-                    targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
+            # Reashape state to meet Keras requirements
+            state     =     state.reshape(np.concatenate((np.array([1]),     state.shape), axis=0))
+            nextState = nextState.reshape(np.concatenate((np.array([1]), nextState.shape), axis=0))
 
-                target = self.__model(state).numpy()
-                target[0][action] = targetReward
+            # If done, target reward is the historical reward
+            targetReward = reward
+            # Otherwise compute target as the sum of historical
+            # reward and weighted future estimation
+            if not done:
+                targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
 
-                # Save target to the batch
-                batchInput[record] = state[0]
-                batchOutput[record] = target[0]
+            # Compute target
+            target = self.__model(state).numpy()
+            target[0][action] = targetReward
 
-            self.__model.fit(batchInput, batchOutput, epochs=1, verbose=0)
+            # Save training sample
+            trainingInput[dataLen - dataIdx - 1] = state[0]
+            trainingOutput[dataLen - dataIdx - 1] = target[0]
+
+            self.__model.fit(trainingInput, trainingOutput, batch_size=batchSize, epochs=epochs, shuffle=False, verbose=0)
 
         # Update epsilon
         if self.epsilon * self.epsilonDecay >= self.epsilonMin:

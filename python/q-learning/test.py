@@ -17,6 +17,11 @@ env = gym.make('CartPole-v1')
 # Path to the model
 modelName = 'python/q-learning/models/score_499.0'
 
+# Number of games to play
+gamesNum
+
+# Display render
+display = True
 
 #------------------------------------------------------------------#
 #--------------------------- Initialization -----------------------#
@@ -30,7 +35,7 @@ agent.load(modelName)
 #------------------------------ Training --------------------------#
 #------------------------------------------------------------------#
 
-while True:
+for gameNum in range (1, gamesNum + 1):
 
     # Reset environment
     state = env.reset()
@@ -41,7 +46,8 @@ while True:
     while True:
 
         # Render scene
-        env.render()
+        if display:
+            env.render()
 
         # Interact with environment
         action = agent.act(state)
@@ -54,3 +60,4 @@ while True:
         if done:
             print("Score{}".format(score))
             break
+
