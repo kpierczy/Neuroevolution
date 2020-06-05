@@ -3,9 +3,12 @@ Before playing with the project:
 
     -> create and active virtualenv
     -> install mujoco-py (follow https://github.com/openai/mujoco-py)
-    -> install required packages with 'required.txt'
+    -> install required packages :
+        - 'required.txt'      (tf-nightly)     [NVidia GPU]
+        - 'required-rocm.txt' (tensorflow-rocm)[AMD GPU]
 
-Note : Project uses tf-nightly build that contains slightly different API
-       than standard tensorflow distribution.
+All scripts should be called from the project home directory 
 
-Note : All scripts should be called from the project home directory 
+# Dependancies
+RadeoOpenCompute (Tensorflow): https://github.com/ROCmSoftwarePlatform/tensorflow-upstream/blob/develop-upstream/rocm_docs/tensorflow-install-basic.md
+MuJoCo : https://github.com/openai/mujoco-py
