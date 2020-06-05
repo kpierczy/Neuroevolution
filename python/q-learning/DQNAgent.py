@@ -124,8 +124,24 @@ class DQNAgent:
     @param done : true if iteration was last in the episode
 
     """
-    def store(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+    def store(self, state, action, reward, nextState, done):
+
+        # Reashape state to meet Keras requirements
+        state     =     state.reshape(np.concatenate((np.array([1]),     state.shape), axis=0))
+        nextState = nextState.reshape(np.concatenate((np.array([1]), nextState.shape), axis=0))
+
+        # If done, target reward is the historical reward
+        targetReward = reward
+        # Otherwise compute target as the sum of historical reward and weighted future estimation
+        if not done:
+            targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
+
+        # Compute target
+        target = self.__model(state).numpy()
+        target[0][action] = targetReward
+        
+        # Save training pair
+        self.memory.append((state[0], target[0]))
 
 
 
@@ -192,26 +208,11 @@ class DQNAgent:
         for dataIdx in reversed(range(0, dataLen)):
 
             # Unpack transition data
-            state, action, reward, nextState, done = data[dataIdx]
-
-            # Reashape state to meet Keras requirements
-            state     =     state.reshape(np.concatenate((np.array([1]),     state.shape), axis=0))
-            nextState = nextState.reshape(np.concatenate((np.array([1]), nextState.shape), axis=0))
-
-            # If done, target reward is the historical reward
-            targetReward = reward
-            # Otherwise compute target as the sum of historical
-            # reward and weighted future estimation
-            if not done:
-                targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
-
-            # Compute target
-            target = self.__model(state).numpy()
-            target[0][action] = targetReward
+            state, target = data[dataIdx]
 
             # Save training sample
-            trainingInput[dataLen - dataIdx - 1] = state[0]
-            trainingOutput[dataLen - dataIdx - 1] = target[0]
+            trainingInput[dataLen - dataIdx - 1]  = state
+            trainingOutput[dataLen - dataIdx - 1] = target
 
             self.__model.fit(trainingInput, trainingOutput, batch_size=batchSize, epochs=epochs, shuffle=False, verbose=0)
 

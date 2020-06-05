@@ -12,14 +12,16 @@ from DQNAgent   import DQNAgent
 #---------------------------- Configuration -----------------------#
 #------------------------------------------------------------------#
 
-# GPU usage config
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+# GPU usage config (HIP for AMD; CUDA for Nvidia)(-1 for CPU; 0,1,... for GPUs)
+os.environ["HIP_VISIBLE_DEVICES"]  = "-1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Training environment
 env = gym.make('Breakout-ram-v0')
 # Directory for model's saves
 modelsDir = 'python/q-learning/models/'
+# Name of the final model save
+finalName = 'final'
 # Model to load (optional: False -> create new model)
 modelPath = False
 
@@ -42,9 +44,9 @@ epsilonMin   = 0.005
 # Learning mode (@see DQNAgent.learn())
 mode = 'random'
 # Learning data parameters
-batchSize  = 100
-iterations = 1000
-epochs     = 6
+batchSize  = 10
+iterations = 3
+epochs     = 1
 # Learning features
 learningRate = 1e-3
 optimiser    = keras.optimizers.Adam(learning_rate=learningRate)
@@ -52,6 +54,7 @@ loss         = 'mse'
 
 # Model's internal layers
 layerStack = (
+    keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense(256, activation='relu'),
     keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense( 64, activation='relu')
@@ -66,7 +69,7 @@ penalty = -10
 # Number of last episodes that an average score is computed from
 avgLen = 100
 # Score threshold for model's save
-threshold = 450
+threshold = 20
 
 # Display training simulations
 display = False
@@ -162,9 +165,9 @@ for gameNum in range(gamesNum):
         agent.save(modelsDir + 'score_{}'.format(score - penalty))
 
     # Teach model
-    if len(agent.memory) > batchSize:
+    if len(agent.memory) >= batchSize * iterations:
         agent.learn(mode=mode, batchSize=batchSize, iterations=iterations, epochs=epochs)
 
 # Save final model 
-agent.save(modelsDir + 'score_{}_final'.format(score - penalty))
+agent.save(modelsDir + finalName)
     
