@@ -1,246 +1,424 @@
+"""
+   Filename : DQNAgent.cpp
+       Date : Sun June 06 2020
+     Author : Krzysztof Pierczyk
+    Version : 1.0
+
+Description : DQN agent implementation based on the DeepMind-like DQN from:
+              https://github.com/fg91/Deep-Q-Learning/blob/master/DQN.ipynb
+"""
+
+
 import numpy as np
-from random import shuffle
+import random
 from collections import deque
+import tensorflow as tf
 from tensorflow import keras
 import random
 
 class DQNAgent:
+
     """
     DQN (Deep Q Network) agent class utilizing Keras programming model.
     Model implement's DeepMind-like RL algorithm sharing simple learning
     and usage interface.
+    """
 
-    This class was inspired by the John Krohn. Original scetch can be 
-    found under:
-        https://github.com/the-deep-learners/TensorFlow-LiveLessons/blob/master/notebooks/cartpole_dqn.ipynb
+    class ReplayMemory:
+
+        """ Utility class used to manage replay memory """
+
+        def __init__(self, stateShape, stackedStateLength=4, size=10000,
+                     batchSize=32, stateDtype=np.float32):
+
+            """
+            Initialize replay memory of the given size
+
+            Args:
+                stateShape : np.array, shape of the observed states
+                stackedStateLength : number of states stacked together
+                    to create an agent's state
+                size : Integer, size of the memory buffer
+                batchSize : Integer, size of the single training batch
+                stateDtype : np.datatype, type of the data representing 
+                    states
+
+            """
+
+            self.size = size
+            self.stateShape = stateShape
+            self.stackedStateLength = stackedStateLength
+            self.batchSize = batchSize
+
+            # Create memory buffers
+            self.count = 0
+            self.current = 0
+            self.states  = np.empty(
+                np.concatenate((np.array([self.size]), stateShape), axis=0), 
+                dtype=stateDtype
+            )
+            self.actions = np.empty(self.size, dtype=np.int32)
+            self.rewards = np.empty(self.size, dtype=np.float32)
+            self.dones   = np.empty(self.size, dtype=np.bool)
+
+            # Pre-allocate memory for the mini-batches
+            self.trainingStates = np.empty(
+                np.concatenate((np.array([self.batchSize, self.stackedStateLength]), stateShape), axis=0),
+                dtype=stateDtype
+            )
+            self.trainingNextStates = np.empty(
+                np.concatenate((np.array([self.batchSize, self.stackedStateLength]), stateShape), axis=0),
+                dtype=stateDtype
+            )
+            self.indices = np.empty(self.batchSize, dtype=np.int32)
+
+
+
+
+        def store(self, action, reward, nextState, done):
+
+            """
+            Stores a new transition
+
+            Args:
+                action : Integer, index of the performed action
+                reward : float, obtained reward
+                nextState : np.array, state after performing the action
+                done : Bolean, parameter stating whether the episode terminated
+            """
+
+            if nextState.shape != self.stateShape:
+                raise ValueError("State's dimension invalid")
+            self.actions[self.current] = action
+            self.states[self.current] = nextState
+            self.rewards[self.current] = reward
+            self.dones[self.current] = done
+
+            self.count = max(self.count, self.current + 1)
+            self.current = (self.current + 1) % self.size
+
+
+        def _getState(self, idx):
+
+            """ Returns agent's (stacked) state with the given index """
+
+            if self.count == 0:
+                ValueError("The replay memory is empty!")
+            if idx < self.stackedStateLength - 1:
+                raise ValueError("Index must be greater than the size of the state stack!")
+            return self.states[idx - self.stackedStateLength + 1 : idx + 1, ...]
+
+
+
+
+        def _getValidIndices(self):
+
+            """
+            Writes indices for the next batch to the self.indices.
+            Indices are pick randomly and invalid indices are rejected.
+            Index can be invalid when:
+                (1) state at the som of the 'self.stackedStateLength - 1'
+                    states is terminal. Then, stacked state will contain
+                    observed states from different games
+                (2) index is smaller than 'self.stackedStateLength'
+                (3) index is greater than 'self.current' but (index
+                    - 'self.stackedStateLength') is smaller than the
+                    'self.current'. Then, also stacked state will contain
+                    observed states from different games
+            """
+
+            for i in range(self.batchSize):
+                while True:
+
+                    # Pick random index (index of the 'nextState', not 'state')
+                    index = random.randint(self.stackedStateLength, self.count - 1)
+
+                    # Index pointing to the stackedState has to contain observed states from the single game
+                    if (index >= self.current) and (index - self.stackedStateLength < self.current):
+                        continue
+                    if self.dones[index - self.stackedStateLength : index].any():
+                        continue
+                    break
+
+                # Save index to the pre-allocated array
+                self.indices[i] = index
+
+
+
+
+        def getMiniBatch(self):
+
+            """
+            Returns mini-batch randomly selected from the memory pool
+
+            Returns: 
+                five-elements touple containing:
+                    - np.array of shape (self.batchSize, self.stackedStateLength, *(self.stateShape))
+                      containing states
+                    - np.array of actions
+                    - np.array of rewards
+                    - np.array of shape (self.batchSize, self.stackedStateLength, *(self.stateShape))
+                      containing next states
+                    - np.array of dones
+
+            """
+
+            # Check if memory has enugh data to return mini-batch
+            if self.count <= self.stackedStateLength:
+                raise ValueError('Not enough transitions to get a minibatch')
         
-    """
+            # Write mini-batch indices to pre-allocated array
+            self._getValidIndices()
+                
+            # Fill pre-loaded mini-batch containers with data
+            for idx, stateIdx in enumerate(self.indices):
+                self.trainingStates[idx] = self._getState(stateIdx - 1)
+                self.trainingNextStates[idx] = self._getState(stateIdx)
+            
+            return self.trainingStates, self.actions[self.indices], self.rewards[self.indices], self.trainingNextStates, self.dones[self.indices]
+
+
+    class ImagePreprocesor():
+
+        """ Resizes and converts RGB (if RGB) images to grayscale """
+        
+        def __init__(self, imageShape=(84, 84), crop=((0, 34), (160, 160))):
+            
+            """
+            Args:
+                imageShape : tuple of Integers, size of the preprocessed image in shape
+                    (Width, Heigth)
+                crop : tuple of two tupples of two Integers, parameters of the cropping
+                    process in shape ((xoffset, yoffset), (width, heigth))
+            """
+
+            self.imageShape = imageShape
+            self.cropp = cropp
 
 
 
 
-    """
-    Constructor. Initializes DQN agent with given parameters.
-    
-    @note : constructor doesn't create internal neural net model. 
-            To do this one has to call initialize() method
+        def __call__(self, image):
 
-    @param stateShape : shape of the single state
-    @param actionsNum : number of the actions agent can take
-    @param memSize : size of the internal buffor containing
-        historical data used during training
-    @param gamma : discount rate; the higher the rate is the
-        more actions are taken with respect to future reward
-        rather than immediate one
-    @param gammaRise : parameter controlling discount rate 
-        change from one learning session to another
-    @param gammaMax : maximum value of the discount rate
-    @param epsilon : probability of the performing a random 
-        action by the agent rather than one resulting from
-        neural net model
-    @param epsilonDecay : parameter controlling epsilon change 
-        from one learning session to another
-    @param epsilonMin : minimum value of the epsilon
+            """
+            Args:
+                image: 2-D or 3-D np.array, image to be preprocessed
+            Returns:
+                A processed (84, 84, 1) frame in grayscale
+            """
 
-    """
-    def __init__(self, stateShape, actionsNum, memSize=2000,
-                gamma=0.95, gammaRise=1, gammaMax=0.95,
-                epsilon=1.0, epsilonDecay=0.995, epsilonMin=0.01):
+            # Check dimensionality
+            if len(image.shape) not in (2, 3):
+                raise ValueError('Image has to be 2-D or 3-D object!')
+            # Convert from RGB to grayscale
+            if len(image.shape) == 3:
+                image = tf.image.rgb_to_grayscale(image)
+
+            # Perform cropping
+            image = tf.image.crop_to_bounding_box(image, crop[0][1], crop[0][0], crop[1][1], crop[1][0])
+
+            # Resize image
+            return tf.image.resize(image, self.imageShape, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+
+
+
+
+    def __init__(self, inputs, layerStack, stackedStateLength=4,
+                 gammaPolicy=lambda frameNum : 0.95,
+                 epsilonPolicy=lambda frameNum : 0.995**frameNum,
+                 optimizer='adam', loss='mse', batchSize=32,
+                 memSize=10000, stateDtype=np.float32, **kwargs):
+
+        """
+        Constructor. Initializes DQN agent with given parameters and structure
+
+        Args:
+            inputs : tensorflow.keras.Input, model's input
+            layerStack : tensorflow.python.framework.ops.Tensor, stack of the
+            input and layers constitutig the model
+            stackedStateLength : Integer, number of subsequent observed states
+                that is combined to obtain agent's state
+            gammaPolicy : function handle, discount rate policy, function that
+                takes one Integer argument (frame's number) and returns appropriate
+                discount rate
+            epsilonPolicy : function handle , discount rate policy, function that
+                takes one Integer argument (frame's number) and returns appropriate
+                discount rate
+            optimizer : keras.Optimizer, desired optimiser
+            loss : string or keras.losses object, Keras loss function
+            batchSize : Integer, size of the single learning mini-batch
+            memSize : size of the internal buffer containing historical observations
+                used during training (DeepMin nomenclature: replayMemory)
+            stateDtype : np.dtype, type of the data that observed states are
+                represented with
+
+        Kwargs:
+            imageShape : tuple of Integers (optional, default : (84, 84)), size
+                of the preprocessed image in shape (Width, Heigth)
+            crop : tuple of two tupples of two Integers, (optional, default : 
+                ((0, 34), (160, 160)) parameters of the cropping process in
+                shape ((xoffset, yoffset), (width, heigth))      
+            compileKwargs : keyword arguments passed to the keras.Model.compile
+
+        """
+
+        # Create and compile model
+        compileKwargs = kwargs.copy()
+        if 'croppingParams' in compileKwargs:
+            compileKwargs.pop('croppingParams')
+        if 'frameSize' in compileKwargs:
+            compileKwargs.pop('frameSize')
+        self.__model = keras.Model(inputs=inputs, outputs=layerStack)
+        self.__model.compile(loss=loss, optimizer=optimizer, **compileKwargs)
+
+        # Get model's input's and output's shapes
+        stateShape = self.__model.input_shape[2:]
+        actionsNum = self.__model.output_shape[-1]
 
         # Size of the net's input and output
-        self.stateShape = stateShape
+        if len(stateShape) in (2, 3):
+            self.stateShape = kwargs.get('frameSize', np.array([84, 84]))
+        else:
+            self.stateShape = stateShape
         self.actionsNum = actionsNum
-
-        # Double-ended queue that stores <s_t, a_t, r_t, s_{t+1}> touples registered
-        # by the agent. Touple are used to feed backprop learning process.
-        #   -> s_t     - state in the 't' moment
-        #   -> a_t     - action taken in the 't' moment
-        #   -> r_t     - reward aquired in the 't' moment
-        #   -> s_{t+1} - state in the 't+1' moment
-        self.memory = deque(maxlen=memSize) 
+        self.batchSize = batchSize
+        self.stackedStateLength = stackedStateLength
 
         # Discount rate parameters
-        self.gamma = gamma 
-        self.gammaRise = gammaRise
-        self.gammaMax = gammaMax
+        self.gammaPolicy = gammaPolicy
 
-        # Epsilon parameters - non-zero epsilon makes possibility to take
-        # a random action by the agent rather than following net's result 
-        self.epsilon = 1.0
-        self.epsilonDecay = 0.995
-        self.epsilonMin = 0.01
+        # Epsilon policy parameters
+        self.epsilonPolicy = epsilonPolicy
+        # Number of observations agent has seen
+        self.observationsSeen = 0
 
-        # Internal model
-        self.__model = False
-    
+        # Internal replay memory
+        self.replayMemory = self.ReplayMemory(
+            self.stateShape, stackedStateLength=stackedStateLength,
+            size=memSize, batchSize=batchSize, stateDtype=stateDtype
+        )
 
-
-
-    """
-    (Re)Initializes internal model with given parameters.
-
-    @param layers : list of the Keras internal layers
-    @param loss function : Keras loss function (string or object)
-    @param optimizer : Keras optimizer object
-    @param reinitialize : if True object will be reinitialized
-
-    @returns : true if model was (re)initialized, false otherwise
-
-    """
-    def createModel(self, layers, lossFunction, optimizer, reinitialize=False):
-        
-        if not (self.__model) or (reinitialize):
-            
-            # Declare model's input shape
-            inputs = keras.Input(shape=self.stateShape)
-
-            # Stack internal layers
-            layerStack = layers[0](inputs)
-            for layerNum in range(1, len(layers)):
-                layerStack = layers[layerNum](layerStack)
-
-            # Declare model's output
-            outputs = keras.layers.Dense(self.actionsNum, activation='linear')(layerStack)
-
-            # Create and compile model
-            self.__model = keras.Model(inputs=inputs, outputs=outputs)
-            self.__model.compile(loss=lossFunction, optimizer=optimizer)
-
-            return True
-            
+        # Optional image preprocessor
+        if len(stateShape) in (2,3):
+            self.__imagePreprocesor = self.ImagePreprocesor(
+                imageShape=kwargs.get('imageShape', (84,84)),
+                crop=kwargs.get('crop', ((0, 34), (160, 160)))
+            )
         else:
-            return False
+            self.__imagePreprocesor = None
+
+        # Pre-allocate memory for the training targets
+        self.trainingTargets = np.empty((self.batchSize, self.actionsNum), dtype=stateDtype)
 
 
 
-
-    """
-    Saves single iteration data to the internal log
-
-    @param state : state in the iteration
-    @param action : action take in the iteration
-    @param reward : reward obtain in the iteration
-    @param next_state : state observed after taking an action
-    @param done : true if iteration was last in the episode
-
-    """
-    def store(self, state, action, reward, nextState, done):
-
-        # Reashape state to meet Keras requirements
-        state     =     state.reshape(np.concatenate((np.array([1]),     state.shape), axis=0))
-        nextState = nextState.reshape(np.concatenate((np.array([1]), nextState.shape), axis=0))
-
-        # If done, target reward is the historical reward
-        targetReward = reward
-        # Otherwise compute target as the sum of historical reward and weighted future estimation
-        if not done:
-            targetReward = (reward + self.gamma * np.amax(self.__model(nextState).numpy()[0])) 
-
-        # Compute target
-        target = self.__model(state).numpy()
-        target[0][action] = targetReward
+    def observe(self, action, reward, nextState, done):
         
-        # Save training pair
-        self.memory.append((state[0], target[0]))
+        """
+        Preprocess and saves single transition (composed of the state, action, reward
+        and the next state) data to the internal log
+
+        Args:
+            action : Integer, action take in the iteration
+            reward : float, reward obtained in the iteration
+            next_state :  state observed after taking an action
+            done : true if iteration was last in the episode
+
+        Note:
+            Actual state of the agent is hold internally
+
+        """
+
+        # If image-represented state, preprocess
+        if self.__imagePreprocesor is not None:
+            nextState = self.__imagePreprocesor(nextState)
+
+        # Store observation
+        self.replayMemory.store(action, reward, nextState, done )
+
+        # Increment observation counter
+        self.observationsSeen += 1
 
 
 
-
-    """
-    Performs action choosen for the given state
-
-    @param state : actual state
-
-    """
     def act(self, state):
-    
-        # Decide to act randomly or not
-        if np.random.rand() <= self.epsilon:
-            return random.randrange(self.actionsNum)
-        else:
-
-            actValues = self.__model(
-                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0))
-            ).numpy()
-            return np.argmax(actValues[0])
-
-
-
-
-    """
-    Performs a number of learning batches basing of the historical
-    data. Transitions are sampled randomly from the saved transitions.
-
-    @param mode : string, determines type of the learning process
-        'classic' - batches are taken from the ordered array
-            containing saved transition
-        'random' - batches are taken from the shuffled array
-            constaining saved transitions
-    @param batchSize : size of the single batch, if set of the saved
-        transitions is not divisible by the batch size, the last batch
-        is taken from remaining samples
-    @param iterations : number of batches to complete an epoch
-    @param epochs : number of epochs
-
-    @note : if batchSize times iterations is greater than number of the
-            saved transitions number of samples is trimmed to this number
-
-    """
-    def learn(self, mode='classic', batchSize=1, iterations=1, epochs=1):
         
-        # Prepare training data set
-        if mode == 'classic':
-            data = self.memory
-        elif mode =='random':
-            data = self.memory.copy()
-            shuffle(data)
+        """
+        Returns action choosen for the given state
 
-        # Initialize training data
-        if batchSize * iterations < len(self.memory):
-            dataLen = batchSize * iterations
+        Args:
+            state : np.array, actual state
+
+        """    
+
+        # Decide to act randomly ...
+        if np.random.rand() <= self.epsilonPolicy(self.observationsSeen):
+            return random.randrange(self.actionsNum)
+        # ... or to follow model's deems
         else:
-            dataLen = len(self.memory)
-        trainingInput  = np.zeros(np.concatenate((np.array([dataLen]),             self.stateShape), axis=0))
-        trainingOutput = np.zeros(np.concatenate((np.array([dataLen]), np.array([self.actionsNum])), axis=0))
 
-        # Fill batch arrays
-        batchSamplesNum = 0
-        for dataIdx in reversed(range(0, dataLen)):
+            # Evaluate model
+            return np.argmax(self.__model(
+                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0))
+            ).numpy()[0])
 
-            # Unpack transition data
-            state, target = data[dataIdx]
+
+
+    def learn(self, **kwargs):
+
+
+        """
+        Perform a single mini-batch training basing on the random transitions
+        sampled from the reply memory.
+
+        Args : 
+            batchSize : size of the single batch, if set of the saved transitions
+                is not divisible by the batch size, the last batch is taken from
+                remaining samples
+
+        Kwargs : 
+            arguments passed to the keras.Model.fit(...)
+
+        Returns
+            history dictionary returned by the keras.Model.fit
+
+        """
+
+
+        # Get transitions from the memory pool
+        states, actions, rewards, nextStates, dones = self.replayMemory.getMiniBatch()
+
+        # Prepare data for training
+        for i in range(self.batchSize):
+
+            # State target reward for the transition
+            targetReward = rewards[i]
+            if not dones[i]:
+                targetReward = rewards[i] + self.gammaPolicy(self.observationsSeen) * np.amax(self.__model(nextStates[i:i+1]).numpy()[0]) 
+
+            # Compute network's target
+            target = self.__model(states[i:i+1]).numpy()
+            target[0][actions[i]] = targetReward
 
             # Save training sample
-            trainingInput[dataLen - dataIdx - 1]  = state
-            trainingOutput[dataLen - dataIdx - 1] = target
+            self.trainingTargets[i] = target
 
-            self.__model.fit(trainingInput, trainingOutput, batch_size=batchSize, epochs=epochs, shuffle=False, verbose=0)
-
-        # Update epsilon
-        if self.epsilon * self.epsilonDecay >= self.epsilonMin:
-            self.epsilon *= self.epsilonDecay
-
-        # Update discount rate
-        if self.gamma * self.epsilonDecay <= self.gammaMax:
-            self.gamma *= self.gammaRise
-
-
+        # Perform batch
+        return self.__model.fit(states, self.trainingTargets, batch_size=self.batchSize, epochs=1, **kwargs)
+    
 
 
     """
-    Loads model from the file
-
-    @param name : path to the file to save
-
+    Args:
+        name : string, path to the file to save to
     """
     def load(self, name):
         self.__model = keras.models.load_model(name)
 
     """
-    Saves model to the file
-
-    @param name : path to the file to load from
-    
+    Args:
+        name : string, path to the file to load from    
     """
     def save(self, name):
         self.__model.save(name)

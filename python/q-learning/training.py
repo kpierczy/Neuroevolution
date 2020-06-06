@@ -6,7 +6,7 @@ from collections import deque
 import gym
 import numpy    as np
 from tensorflow import keras
-from DQNAgent   import DQNAgent
+from DQNAgent import DQNAgent
 
 #------------------------------------------------------------------#
 #---------------------------- Configuration -----------------------#
@@ -17,63 +17,51 @@ os.environ["HIP_VISIBLE_DEVICES"]  = "-1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Training environment
-env = gym.make('Breakout-ram-v0')
+env = gym.make('CartPole-v1')
 # Directory for model's saves
 modelsDir = 'python/q-learning/models/'
 # Model to load (optional: False -> create new model)
-modelPath = 'python/q-learning/models/final'
+modelPath = False
 # Name of the final model save
-finalName = 'final'
-
-
-# Observation space wrapper (optional: False -> no wrapper)
-observationWrapper = False
-# Shape of the observation space
-observationShape = np.array(env.observation_space.shape)
-
-# Agent's memory
-memSize      = 10000
-# Discount values
-discount     = 0.95
-discountRise = 1
-discountMax  = 0.95
-# Epsilon values
-epsilon      = 0.9
-epsilonDecay = 0.995
-epsilonMin   = 0.005
-
-# Learning mode (@see DQNAgent.learn())
-mode = 'random'
-# Learning data parameters
-batchSize  = 10
-iterations = 3
-epochs     = 1
-# Learning features
-learningRate = 1e-3
-optimiser    = keras.optimizers.Adam(learning_rate=learningRate)
-loss         = 'mse'
-
-# Model's internal layers
-layerStack = (
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(256, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense( 64, activation='relu')
-)
+finalName = 'python/q-learning/models/CartPole-v1/score_367.0'
 
 # Number of games to play
 gamesNum = 1000
 # Maximum games length
 gamesLengthMax = 5000
 # Penalty for losings
-penalty = -10
+penalty = -5
 # Number of last episodes that an average score is computed from
-avgLen = 100
+avgLen = 30
 # Score threshold for model's save
-threshold = 20
+threshold = 250
+
+# Policy for epsilon management
+epsilonPolicy = lambda frameNum : 0.1*0.9995**frameNum
+
+# Agent's memory
+memSize = 10000
+# Number of states that are stacked together to make agent's state
+stackedStateLength = 1
+
+# Learning data parameters
+batchSize  = 32
+# Learning features
+learningRate = 1e-3
+optimizer    = keras.optimizers.Adam(learning_rate=learningRate)
+loss         = 'mse'
+# Number of frames that action is hold stable
+frameSkip = 1
+
+# Model's stack
+inputs = keras.Input(shape=np.concatenate((np.array([stackedStateLength]), env.observation_space.shape), axis=0))
+layerStack = keras.layers.Flatten()(inputs)
+layerStack = keras.layers.Dense(128, activation='relu')(layerStack)
+layerStack = keras.layers.Dense(128, activation='relu')(layerStack)
+layerStack = keras.layers.Dense(env.action_space.n, activation='linear')(layerStack)
 
 # Display training simulations
-display = False
+display = True
 
 
 #------------------------------------------------------------------#
@@ -83,14 +71,14 @@ display = False
 # Initialize a new model
 if not modelPath:
     agent = DQNAgent(
-        observationShape, env.action_space.n, memSize=memSize,
-        gamma=discount, gammaRise=discountRise, gammaMax=discountMax,
-        epsilon=epsilon, epsilonDecay=epsilonDecay, epsilonMin=epsilonMin
+        inputs, layerStack, memSize=memSize, stackedStateLength=stackedStateLength,
+        epsilonPolicy=epsilonPolicy, optimizer=optimizer, loss=loss, batchSize=batchSize
     )
-    agent.createModel(layerStack, loss, optimiser)
 # ... or load the old one for futher learning
 else:
-    agent = DQNAgent(env.observation_space.shape[0], env.action_space.n)
+    agent = DQNAgent(
+        env.observation_space.shape, env.action_space.n, layerStack
+    )
     agent.load(modelPath)
 
 # Create folder for the models
@@ -114,6 +102,7 @@ for gameNum in range(gamesNum):
 
     # Play a game
     score = 0
+    frameSkipCounter = 0
     for _ in range(gamesLengthMax):
 
         # Display render
@@ -121,20 +110,25 @@ for gameNum in range(gamesNum):
             env.render()
 
         # Interact with environment
-        action = agent.act(state)
-        nextState, reward, done, _ = env.step(action)
+        if frameSkipCounter == 0:
+            action = agent.act(np.repeat(state, stackedStateLength))
+        frameSkipCounter += 1
+        if frameSkipCounter == frameSkip + 1:
+            frameSkipCounter = 0
+        state, reward, done, _ = env.step(action)
 
         # Assign penlaty if agent lost
         reward = reward if not done else penalty
 
         # Save interaction result to the history set
-        agent.store(state, action, reward, nextState, done)
-
-        # Pass state
-        state = nextState
+        agent.observe(action, reward, state, done)
 
         # Update score
         score += reward
+
+        # Teach model
+        if agent.replayMemory.count > stackedStateLength:
+            agent.learn(verbose=0)
 
         # Print summary if done
         if done:
@@ -145,12 +139,12 @@ for gameNum in range(gamesNum):
 
     # Print score
     if gameNum + 1 < avgLen:
-        print("Episode: {}/{}, Score: {}, Average: {:.3f}, epsilon: {:.2f}".format(
+        print("Episode: {}/{}, Score: {:6.3f}, Average: {:.3f}, epsilon: {:.2f}".format(
             gameNum + 1,
             gamesNum,
             scoresWin[scoreIdx - 1],
             np.mean(scoresWin[:scoreIdx]),
-            agent.epsilon
+            agent.epsilonPolicy(agent.observationsSeen)
         ))
     else:
         print("Episode: {}/{}, Score: {}, Average: {:.3f}, epsilon: {:.2f}".format(
@@ -158,16 +152,12 @@ for gameNum in range(gamesNum):
             gamesNum,
             scoresWin[scoreIdx - 1],
             np.mean(scoresWin),
-            agent.epsilon
+            agent.epsilonPolicy(agent.observationsSeen)
         ))
 
     # Save model
     if score >= threshold:
-        agent.save(modelsDir + 'score_{}'.format(score - penalty))
-
-    # Teach model
-    if len(agent.memory) >= batchSize * iterations:
-        agent.learn(mode=mode, batchSize=batchSize, iterations=iterations, epochs=epochs)
+        agent.save(os.path.join(modelsDir, 'score_{}'.format(score - penalty)))
 
 # Save final model 
 agent.save(modelsDir + finalName)
