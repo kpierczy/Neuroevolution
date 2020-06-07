@@ -15,7 +15,7 @@
     },
     "agent": {
         "replayMemorySize" : 1000000,
-        "initialReplayMemorySize" : 20000,
+        "initialRandomFrames" : 20000,
         "clipReward" : true,
         "trainingFrameKeep" : 3,
         "evaluationFrameKeep" : 1,
@@ -43,8 +43,8 @@
         "batchSize" : 32,
         "layers" : [
             {"type" : "flatten"},
-            {"type" : "dennse", "units" : 128, "activation" : "relu", "initializer" : "varianceScaling", "scale" : 2},
-            {"type" : "dennse", "units" : 128, "activation" : "relu", "initializer" : "varianceScaling", "scale" : 2}
+            {"type" : "dense", "units" : 128, "activation" : "relu", "initializer" : "varianceScaling", "scale" : 2},
+            {"type" : "dense", "units" : 128, "activation" : "relu", "initializer" : "varianceScaling", "scale" : 2}
         ],
         "name" : "DQN_Breakout_player"
     },

@@ -1,14 +1,15 @@
 import sys
 sys.path.insert(0, 'python')
-print(sys.path)
+
 import os
 import gym
 import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+
 from DQNAgent import DQNAgent
-from utilities import linearEpsilon
+from utilities import linearEpsilon, save
 from common.session import session
 
 
@@ -30,6 +31,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = config['computeDevices']
 
 # Create training environment
 env = gym.make(config['environment'])
+
+# Create folders for the models and memory stamps
+savesDir = os.path.join(config['paths']['savesDir'], env.unwrapped.spec.id)
+if not os.path.exists(savesDir):
+    os.mkdir(savesDir)
+if not os.path.exists(os.path.join(savesDir, 'models')):
+    os.mkdir(os.path.join(savesDir, 'models'))
+if not os.path.exists(os.path.join(savesDir, 'replays')):
+    os.mkdir(os.path.join(savesDir, 'replays'))
 
 # Policy for epsilon management
 epsilon = lambda frameNum : 0.5
@@ -78,8 +88,8 @@ for layer in config['model']['layers']:
         # Stack layer
         layerStack = keras.layers.Dense(
             layer['units'], activation=layer['activation'],
-            kernel_initializer=layer['activation'],
-            initializer=initializer
+            kernel_initializer=initializer,
+            bias_initializer=initializer
         )(layerStack)
 
     # Flatten layer
@@ -96,7 +106,7 @@ layerStack = keras.layers.Dense(
 # Initialize a new model
 if not config['paths']['initialModelName']:
     agent = DQNAgent(
-        inputs, layerStack, memSize=config['agent']['replayMemorySize'],
+        inputs, layerStack, memSize=config['agent']['initialRandomFrames'],
         stackedStateLength=config['agent']['stackedStateLength'],
         epsilonPolicy=epsilonPolicy, optimizer=optimizer,
         loss=config['model']['lossFunction'], batchSize=config['model']['batchSize'],
@@ -107,30 +117,26 @@ else:
     agent = DQNAgent(
         env.observation_space.shape, env.action_space.n, layerStack
     )
-    agent.load(os.path.join(
+    modelToLoad = os.path.join(
         config['paths']['savesDir'],
         env.unwrapped.spec.id,
          'models',
          config['paths']['initialModelName']
-    ))
-
+    )
+    agent.loadModel(modelToLoad)
 
 # Load replay memory if needed
 if config['paths']['initialReplayMemoryName'] != False:
-    replayMemoryPath = os.path.join(
+    replaysToLoad = os.path.join(
         config['paths']['savesDir'],
         env.unwrapped.spec.id,
         'replays',
         config['paths']['initialReplayMemoryName']
     )
-    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'actions'))
-    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'dones'))
-    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'rewards'))
-    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'states'))
-
+    agent.loadMemory(replaysToLoad)
 
 #===================================================================================#
 #====================================== Training ===================================#
 #===================================================================================#
 
-session(env, config, agent)
+session(env, config, agent, lambda name : save(name, savesDir, agent))

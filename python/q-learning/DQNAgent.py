@@ -2,12 +2,13 @@
    Filename : DQNAgent.cpp
        Date : Sat June 06 2020
      Author : Krzysztof Pierczyk
-    Version : 1.0
+    Version : 1.1
 
 Description : DQN agent implementation based on the DeepMind-like DQN from:
               https://github.com/fg91/Deep-Q-Learning/blob/master/DQN.ipynb
 """
 
+import os
 import numpy as np
 import random
 import tensorflow as tf
@@ -464,18 +465,59 @@ class DQNAgent:
     
 
 
+    def loadModel(self, modelPath):
+
+        """
+        Loads model saved with the keras.Model.save() call
+
+        Args:
+            modelPath : string, path to the folder to load model from
+        """
+
+        self.model = keras.models.load_model(modelPath)
 
 
-    """
-    Args:
-        name : string, path to the file to save to
-    """
-    def load(self, name):
-        self.model = keras.models.load_model(name)
+    def loadMemory(self, memoryPath):
 
-    """
-    Args:
-        name : string, path to the file to load from    
-    """
-    def save(self, name):
-        self.model.save(name)
+        """
+        Loads replay memory saved with the self.saveMemory() call
+
+        Args:
+            mmemoryPath : string, path to the folder to load replay memory from
+        """
+
+        self.replayMemory.actions = np.load(os.path.join(memoryPath, 'actions'))
+        self.replayMemory.dones = np.load(os.path.join(memoryPath, 'dones'))
+        self.replayMemory.rewards = np.load(os.path.join(memoryPath, 'rewards'))
+        self.replayMemory.states = np.load(os.path.join(memoryPath, 'states'))
+
+
+    def saveModel(self, modelPath):
+        
+        """
+        Saves model to the folder
+
+        Args:
+            modelPath : string, path to the folder to save model to    
+        """        
+        
+        self.model.save(modelPath)
+
+
+    def saveMemory(self, memoryPath):
+        
+        """
+        Saves replay memory to the folder
+
+        Args:
+            mmemoryPath : string, path to the folder to save replay memory to
+        """
+
+        if not os.path.exists(memoryPath):
+            os.mkdir(memoryPath)
+        np.save(os.path.join(memoryPath, 'actions'), self.replayMemory.actions)
+        np.save(os.path.join(memoryPath, 'dones'), self.replayMemory.dones)
+        np.save(os.path.join(memoryPath, 'rewards'), self.replayMemory.rewards)
+        np.save(os.path.join(memoryPath, 'states'), self.replayMemory.states) 
+        
+ 

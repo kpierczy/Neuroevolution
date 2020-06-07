@@ -2,25 +2,66 @@ import os
 import numpy as np
 import tensorflow as tf
 
+"""
+   Filename : session.cpp
+       Date : San June 07 2020
+     Author : Krzysztof Pierczyk
+    Version : 1.0
 
+Description : Simple framework desired to train an arbitrary RL algorithm with
+              saves automatisation and Tensorboard management
+"""
 
-def session(env, config, agent):
+def session(env, config, agent, save):
     
     """
-    Generic training session for an arbitrary RL algorithm. session() manages
-    saving & loading models as well Tensorboard updating. Every 'agent' object
-    that meets some 
+    Generic training session for an arbitrary RL algorithm. Function implements
+    a training loop that contains training epochs and evaluation epochs. After
+    every evaluation a model and replay memory are saved to the files.
+    
+    session() manages saving models with the given policy as well Tensorboard 
+    updating. Every 'agent' object that meets some interface requirements can 
+    use the the session() training.
+
+    Function was tested on the set of Atari environments set, but will probably
+    works with other environments.
+
+    Args:
+        env : gym environment, an arbitrary gym environment
+        config : dictionary, configuration string loaded from the configuration
+            file. To acquire informations about required configuration fields
+            @see README.md
+        agent : object, an arbitrary RL agent sharing some required interface
+            ('*' refer to object's member field, when '-' to member methods):
+
+            * model : 
+                keras model
+            * epsilonPolicy : 
+                handler to the function 'fun(frameNum)' returning epsilon value
+                for the given frames number
+            * observationsSeen :
+                foregoing number of observe() calls
+                
+            - stateReset() : 
+                resets agent's state between games
+            - act(state, frameKeep=1, evaluation=False) : 
+                returns agent's action for the given state, Function takes two
+                keyword arguments. 'frameKeep' states for how many iterations
+                action is hold without a change. 'evaluation' states if
+                act(...) is called in the avaluation or training context
+            - observe(action, reward, state, done) : 
+                saves observation to the agent's memory. 'action' is the action
+                taken in the current iteration, 'reward' is the reward acquired
+                after taking the 'action', 'state' is the state observed AFTER
+                performing the 'action' and 'done' is a boolean which is true
+                if the game iterations terminated
+            - learn(**kwargs) : 
+                keyword arguments passed to the keras.Model.fit(...) function
+        save : function handler with save(name) header saving the model given
+            a name
+
 
     """
-
-    # Create folder for the models
-    savesDir = os.path.join(config['paths']['savesDir'], env.unwrapped.spec.id)
-    if not os.path.exists(savesDir):
-        os.mkdir(savesDir)
-    if not os.path.exists(os.path.join(savesDir, 'models')):
-        os.mkdir(os.path.join(savesDir, 'models'))
-    if not os.path.exists(os.path.join(savesDir, 'replays')):
-        os.mkdir(os.path.join(savesDir, 'replays'))
 
     # initialize evaluation score
     avgEvalReward = 0
@@ -105,7 +146,7 @@ def session(env, config, agent):
                     agent.observe(action, reward, state, liveLost)
 
                     # Teach model
-                    if framesNum > config['agent']['initialReplayMemorySize'] and \
+                    if framesNum > config['agent']['initialRandomFrames'] and \
                         framesNum % config['time']['learningFrequency'] == 0:
                         history = agent.learn(verbose=config['log']['verboseLearning'])
                         lossLog.append(history.history['loss'])
@@ -118,7 +159,7 @@ def session(env, config, agent):
                 trainingRewards.append(episodeReward)
 
                 # Update training stats on the Tensorboard
-                if framesNum > config['agent']['initialReplayMemorySize'] and \
+                if framesNum > config['agent']['initialRandomFrames'] and \
                     len(trainingRewards) % config['log']['trainingLogUpdateFreq'] == 0:
 
                     with summaryWriter.as_default():
@@ -179,53 +220,16 @@ def session(env, config, agent):
             print("=================================================")
             print("\n")
 
-            # Save model & replay memory
-            agent.save(os.path.join(
-                config['paths']['savesDir'],
-                env.unwrapped.spec.id,
-                'models',
-                'avg_eval_{}'.format(avgEvalReward)
-            ))
-            
-            # Save replay memory
-            replayMemoryDir = os.path.join(
-                config['paths']['savesDir'],
-                env.unwrapped.spec.id,
-                'replays',
-                'avg_eval_{}'.format(avgEvalReward)
-            )
-            if not os.path.exists(replayMemoryDir):
-                os.mkdir(replayMemoryDir)
-            np.save(os.path.join(replayMemoryDir, 'actions'), agent.replayMemory.actions)
-            np.save(os.path.join(replayMemoryDir, 'dones'), agent.replayMemory.dones)
-            np.save(os.path.join(replayMemoryDir, 'rewards'), agent.replayMemory.rewards)
-            np.save(os.path.join(replayMemoryDir, 'states'), agent.replayMemory.states) 
+            # Save model
+            save('avg_eval_{}'.format(avgEvalReward))
 
 
     #--------------------------------------------------------#
-    #   If exception occured, save model and replay memory   #
+    #           If exception occured, save model             #
     #--------------------------------------------------------#
 
     finally:
 
-        # Save model & replay memory
-        agent.save(os.path.join(
-            config['paths']['savesDir'],
-            env.unwrapped.spec.id,
-            'models',
-            'interrupted_avg_eval_{}'.format(avgEvalReward)
-        ))
+        # Save model
+        save('interrupted_avg_eval_{}'.format(avgEvalReward))
 
-        # Save replay memory
-        replayMemoryDir = os.path.join(
-            config['paths']['savesDir'],
-            env.unwrapped.spec.id,
-            'replays',
-            'interrupted_avg_eval_{}'.format(avgEvalReward)
-        )
-        if not os.path.exists(replayMemoryDir):
-            os.mkdir(replayMemoryDir)
-        np.save(os.path.join(replayMemoryDir, 'actions'), agent.replayMemory.actions)
-        np.save(os.path.join(replayMemoryDir, 'dones'), agent.replayMemory.dones)
-        np.save(os.path.join(replayMemoryDir, 'rewards'), agent.replayMemory.rewards)
-        np.save(os.path.join(replayMemoryDir, 'states'), agent.replayMemory.states)        
