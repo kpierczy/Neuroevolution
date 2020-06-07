@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, 'python')
+print(sys.path)
 import os
 import gym
 import json
@@ -6,38 +9,38 @@ import tensorflow as tf
 from tensorflow import keras
 from DQNAgent import DQNAgent
 from utilities import linearEpsilon
+from common.session import session
 
-#------------------------------------------------------------------#
-#---------------------------- Configuration -----------------------#
-#------------------------------------------------------------------#
+
+#===================================================================================#
+#================================== Configuration ==================================#
+#===================================================================================#
 
 # Load configuration
-config = json.load('python/q-learning/trainingParams.json')
+with open('python/q-learning/trainingParams.json') as configFile:
+    config = json.load(configFile)
 
-
-#------------------------------------------------------------------#
-#--------------------------- Initialization -----------------------#
-#------------------------------------------------------------------#
+#===================================================================================#
+#================================== Initialization =================================#
+#===================================================================================#
 
 # GPU usage config (HIP for AMD; CUDA for Nvidia)(-1 for CPU; 0,1,... for GPUs)
 os.environ["HIP_VISIBLE_DEVICES"]  = config['computeDevices']
 os.environ["CUDA_VISIBLE_DEVICES"] = config['computeDevices']
 
-
 # Create training environment
 env = gym.make(config['environment'])
-
 
 # Policy for epsilon management
 epsilon = lambda frameNum : 0.5
 if config['agent']['epsilonPolicy'] == 'linear':
     epsilonPolicy = lambda frameNum : linearEpsilon(frameNum, 
             initial=config['agent']['epsilonPolicyConfig']['linear']['initial'],
-            initialPeriod=config['initialPeriod']['agent']['linear']['epsilonPolicyConfig'],
-            firstTarget=config['firstTarget']['agent']['linear']['epsilonPolicyConfig'],
-            firstTargetPeriod=config['firstTargetPeriod']['agent']['linear']['epsilonPolicyConfig'],
-            finalTarget=config['finalTarget']['agent']['linear']['epsilonPolicyConfig'],
-            finalTargetPeriod=config['finalTargetPeriod']['agent']['linear']['epsilonPolicyConfig'],
+            initialPeriod=config['agent']['epsilonPolicyConfig']['linear']['initialPeriod'],
+            firstTarget=config['agent']['epsilonPolicyConfig']['linear']['firstTarget'],
+            firstTargetPeriod=config['agent']['epsilonPolicyConfig']['linear']['firstTargetPeriod'],
+            finalTarget=config['agent']['epsilonPolicyConfig']['linear']['finalTarget'],
+            finalTargetPeriod=config['agent']['epsilonPolicyConfig']['linear']['finalTargetPeriod'],
         )
 elif config['agent']['epsilonPolicy'] == 'exponential':
     epsilonPolicy = lambda frameNum : np.multiply(
@@ -45,25 +48,25 @@ elif config['agent']['epsilonPolicy'] == 'exponential':
         config['agent']['epsilonPolicyConfig']['exponential']['decay']**frameNum
     )
 
-
 # Optimiser
-optimiser = keras.optimizers.Adam(learning_rate=config['model']['learningRate'])
-if config['model']['optimiser'] == 'SGD':
-    optimiser = keras.optimizers.SGD(learning_rate=config['model']['learningRate'])
-elif config['model']['optimiser'] == 'RMSprop':
-    optimiser = keras.optimizers.RMSprop(learning_rate=config['model']['learningRate'])
-elif config['model']['optimiser'] == 'Adadelta':
-    optimiser = keras.optimizers.Adadelta(learning_rate=config['model']['learningRate'])
-elif config['model']['optimiser'] == 'Adamax':
-    optimiser = keras.optimizers.Adamax(learning_rate=config['model']['learningRate'])
-elif config['model']['optimiser'] == 'Adagrad':
-    optimiser = keras.optimizers.Adagrad(learning_rate=config['model']['learningRate'])
-
+optimizer = keras.optimizers.Adam(learning_rate=config['model']['learningRate'])
+if config['model']['optimizer'] == 'SGD':
+    optimizer = keras.optimizers.SGD(learning_rate=config['model']['learningRate'])
+elif config['model']['optimizer'] == 'RMSprop':
+    optimizer = keras.optimizers.RMSprop(learning_rate=config['model']['learningRate'])
+elif config['model']['optimizer'] == 'Adadelta':
+    optimizer = keras.optimizers.Adadelta(learning_rate=config['model']['learningRate'])
+elif config['model']['optimizer'] == 'Adamax':
+    optimizer = keras.optimizers.Adamax(learning_rate=config['model']['learningRate'])
+elif config['model']['optimizer'] == 'Adagrad':
+    optimizer = keras.optimizers.Adagrad(learning_rate=config['model']['learningRate'])
 
 # Model's input
-layerStack = keras.Input(shape=np.concatenate((np.array([config['agent']['stackedStateLength']]), env.observation_space.shape), axis=0))
+inputs = keras.Input(shape=np.concatenate((np.array([config['agent']['stackedStateLength']]), env.observation_space.shape), axis=0))
+layerStack = inputs
 # Model's stack
 for layer in config['model']['layers']:
+
     # Dense layer
     if layer['type'] == 'dense':
 
@@ -77,11 +80,11 @@ for layer in config['model']['layers']:
             layer['units'], activation=layer['activation'],
             kernel_initializer=layer['activation'],
             initializer=initializer
-        )
+        )(layerStack)
 
     # Flatten layer
     elif layer['type'] == 'flatten':
-        layerStack = keras.layers.Flatten()
+        layerStack = keras.layers.Flatten()(layerStack)
         
 # Model's output
 layerStack = keras.layers.Dense(
@@ -93,96 +96,41 @@ layerStack = keras.layers.Dense(
 # Initialize a new model
 if not config['paths']['initialModelName']:
     agent = DQNAgent(
-        inputs, layerStack, memSize=memSize, stackedStateLength=stackedStateLength,
-        epsilonPolicy=epsilonPolicy, optimizer=optimizer, loss=loss, batchSize=batchSize
+        inputs, layerStack, memSize=config['agent']['replayMemorySize'],
+        stackedStateLength=config['agent']['stackedStateLength'],
+        epsilonPolicy=epsilonPolicy, optimizer=optimizer,
+        loss=config['model']['lossFunction'], batchSize=config['model']['batchSize'],
+        modelName=config['model']['name']
     )
-# ... or load the old one for futher learning
+# Or load the old one for futher learning
 else:
     agent = DQNAgent(
         env.observation_space.shape, env.action_space.n, layerStack
     )
-    agent.load(modelPath)
+    agent.load(os.path.join(
+        config['paths']['savesDir'],
+        env.unwrapped.spec.id,
+         'models',
+         config['paths']['initialModelName']
+    ))
 
-# Create folder for the models
-modelsDir = os.path.join(modelsDir, env.unwrapped.spec.id)
-if not os.path.exists(modelsDir):
-    print(os.getcwd())
-    os.mkdir(modelsDir)
 
-# Initialize average score window
-scoreIdx  = 0
-scoresWin = np.zeros((avgLen))
+# Load replay memory if needed
+if config['paths']['initialReplayMemoryName'] != False:
+    replayMemoryPath = os.path.join(
+        config['paths']['savesDir'],
+        env.unwrapped.spec.id,
+        'replays',
+        config['paths']['initialReplayMemoryName']
+    )
+    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'actions'))
+    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'dones'))
+    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'rewards'))
+    agent.replayMemory.states = np.load(os.path.join(replayMemoryPath, 'states'))
 
-#------------------------------------------------------------------#
-#------------------------------ Training --------------------------#
-#------------------------------------------------------------------#
 
-for gameNum in range(gamesNum):
+#===================================================================================#
+#====================================== Training ===================================#
+#===================================================================================#
 
-    # Reset environment
-    state = env.reset()
-
-    # Play a game
-    score = 0
-    lives = 0
-    for _ in range(gamesLengthMax):
-
-        # Display render
-        if display:
-            env.render()
-
-        # Interact with environment
-        action = agent.act(state, frameKeep=frameKeep)
-        state, reward, done, info = env.step(action)
-
-        # Make agent treat each lost life as the episode's end
-        if info['ale.lives'] < lives:
-            liveLost = True
-        else:
-            liveLost = False
-
-        # Assign penlaty if agent a lostlife
-        reward = reward if not done else liveLost
-
-        # Save interaction result to the history set
-        agent.observe(action, reward, state, liveLost)
-
-        # Update score
-        score += reward
-
-        # Teach model
-        if agent.replayMemory.count > stackedStateLength:
-            agent.learn(verbose=0)
-
-        # Print summary if done
-        if done:
-            scoresWin[scoreIdx] = score - penalty
-            scoreIdx += 1
-            scoreIdx %= avgLen
-            break
-
-    # Print score
-    if gameNum + 1 < avgLen:
-        print("Episode: {}/{}, Score: {:6.3f}, Average: {:.3f}, epsilon: {:.2f}".format(
-            gameNum + 1,
-            gamesNum,
-            scoresWin[scoreIdx - 1],
-            np.mean(scoresWin[:scoreIdx]),
-            agent.epsilonPolicy(agent.observationsSeen)
-        ))
-    else:
-        print("Episode: {}/{}, Score: {}, Average: {:.3f}, epsilon: {:.2f}".format(
-            gameNum + 1,
-            gamesNum,
-            scoresWin[scoreIdx - 1],
-            np.mean(scoresWin),
-            agent.epsilonPolicy(agent.observationsSeen)
-        ))
-
-    # Save model
-    if score >= threshold:
-        agent.save(os.path.join(modelsDir, 'score_{}'.format(score - penalty)))
-
-# Save final model 
-agent.save(modelsDir + finalName)
-    
+session(env, config, agent)

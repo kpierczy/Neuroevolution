@@ -53,4 +53,4 @@ def linearEpsilon(frameNum,  initial=1, initialPeriod=50000,
     elif frameNum < initialPeriod + firstTargetPeriod + finalTargetPeriod:
         return firstTarget - (firstTarget - finalTarget) / finalTargetPeriod * (frameNum - initialPeriod - firstTargetPeriod)
     else:
-        return finalTargetPeriod
+        return finalTarget

@@ -1,22 +1,25 @@
 {
-    "computeDevice": -1,
+    "computeDevices": "-1",
     "environment": "Breakout-ram-v0",
     "paths": {
-        "modelsDir" : "python/q-learning/models",
+        "savesDir" : "python/q-learning/saves",
         "initialModelName" : false,
-        "finalModelName" : "Final"
+        "initialReplayMemoryName" : false
     },
     "time": {
         "maxFramesNum" : 500000,
-        "maxFramesPerGame" : 18000,
-        "evaluationFreq" : 30000 
-        
+        "maxFramesPerGame" : 1800,
+        "learningFrequency" : 4,
+        "evaluationFreq" : 10000 ,
+        "evaluationGames" : 5
     },
     "agent": {
-        "replyMemorySize" : 1000000,
-        "frameKeep" : 3,
-        "stackStateLength" : 3,
-        "lostLifePenalty" : -2,
+        "replayMemorySize" : 1000000,
+        "initialReplayMemorySize" : 20000,
+        "clipReward" : true,
+        "trainingFrameKeep" : 3,
+        "evaluationFrameKeep" : 1,
+        "stackedStateLength" : 1,
         "epsilonPolicy" : "linear",
         "epsilonPolicyConfig": {
             "linear": {
@@ -34,19 +37,25 @@
         }
     },
     "model": {
-        "optimiser" : "Adam",
+        "optimizer" : "Adam",
         "lossFunction" : "mse",
         "learningRate" : 25e-5,
         "batchSize" : 32,
         "layers" : [
             {"type" : "flatten"},
-            {"type" : "dennse", "units" : 128, "activation" : "relu", "initialization" : "varianceScaling", "scale" : 2},
-            {"type" : "dennse", "units" : 128, "activation" : "relu", "initialization" : "varianceScaling", "scale" : 2}
-        ]
+            {"type" : "dennse", "units" : 128, "activation" : "relu", "initializer" : "varianceScaling", "scale" : 2},
+            {"type" : "dennse", "units" : 128, "activation" : "relu", "initializer" : "varianceScaling", "scale" : 2}
+        ],
+        "name" : "DQN_Breakout_player"
     },
     "log":{
-        "display" : false,
-        
+        "directory" : "python/q-learning/logs",
+        "logID" : "run_1",
+        "display" : true,
+        "displayEval" : true,
+        "meanTrainingScoreLength" : 100,
+        "verboseLearning" : false,
+        "trainingLogUpdateFreq" : 10
     }
 
 

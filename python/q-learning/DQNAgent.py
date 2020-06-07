@@ -219,7 +219,7 @@ class DQNAgent:
                  epsilonPolicy=lambda frameNum : 0.995**frameNum,
                  optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                  loss='mse', batchSize=32, memSize=10000,
-                 stateDtype=np.float32, **kwargs):
+                 stateDtype=np.float32, modelName="model", **kwargs):
 
         """
         Constructor. Initializes DQN agent with given parameters and structure
@@ -260,17 +260,17 @@ class DQNAgent:
             compileKwargs.pop('croppingParams')
         if 'frameSize' in compileKwargs:
             compileKwargs.pop('frameSize')
-        self.__model = keras.Model(inputs=inputs, outputs=layerStack)
-        self.__model.compile(loss=loss, optimizer=optimizer, **compileKwargs)
+        self.model = keras.Model(inputs=inputs, outputs=layerStack, name=modelName)
+        self.model.compile(loss=loss, optimizer=optimizer, **compileKwargs)
 
         # Define state's shape for image represented states ...
-        if len(self.__model.input_shape[2:]) in (2, 3):
+        if len(self.model.input_shape[2:]) in (2, 3):
             self.stateShape = kwargs.get('frameSize', np.array([84, 84]))
         # ... or fo other states types
         else:
-            self.stateShape = self.__model.input_shape[2:]
+            self.stateShape = self.model.input_shape[2:]
         # Define number of possible actions 
-        self.actionsNum = self.__model.output_shape[-1]
+        self.actionsNum = self.model.output_shape[-1]
         # Save number of subsequent states that are combined to make a single agent's state
         self.stackedStateLength = stackedStateLength
 
@@ -302,7 +302,7 @@ class DQNAgent:
 
 
         # Optional image preprocessor
-        if len(self.__model.input_shape[2:]) in (2,3):
+        if len(self.model.input_shape[2:]) in (2,3):
             self.__imagePreprocesor = self.ImagePreprocesor(
                 imageShape=kwargs.get('imageShape', (84,84)),
                 crop=kwargs.get('crop', ((0, 34), (160, 160)))
@@ -343,13 +343,15 @@ class DQNAgent:
 
 
 
-    def act(self, state, frameKeep=1):
+    def act(self, state, evaluation=False, frameKeep=1):
         
         """
         Returns action choosen for the given state
 
         Args:
             state : np.array, actual state
+            evaluation : Boolean, true if agent is evaluated, False
+                if trained
             frameKeep : Integer, number of iterations that a single
                 action made by the agent should be preserved
 
@@ -369,6 +371,7 @@ class DQNAgent:
                 state.reshape(np.concatenate((np.array([1]), state.shape), axis=0)),
                 self.stackedStateLength, axis=0
             )
+            self.agentStateInitialized = True
         # Update state
         else:
             self.agentState[:-1] = self.agentState[1:]
@@ -376,12 +379,24 @@ class DQNAgent:
 
         # Make action
         if self.__frameKeepCounter == 0:
-            # Make random action with some probability
-            if np.random.rand() <= self.epsilonPolicy(self.observationsSeen):
-                self.__lastAction = random.randrange(self.actionsNum)
-            # Follow model's deems
+
+            # training actions
+            if not evaluation:
+
+                # Make random action with some probability
+                if np.random.rand() <= self.epsilonPolicy(self.observationsSeen):
+                    self.__lastAction = random.randrange(self.actionsNum)
+                # Follow model's deems
+                else:
+                    self.__lastAction = np.argmax(self.model(
+                        self.agentState.reshape(
+                            np.concatenate((np.array([1]), self.agentState.shape), axis=0)
+                        )
+                    ).numpy()[0])
+
+            # Evaluation actions
             else:
-                self.__lastAction = np.argmax(self.__model(
+                self.__lastAction = np.argmax(self.model(
                     self.agentState.reshape(
                         np.concatenate((np.array([1]), self.agentState.shape), axis=0)
                     )
@@ -391,6 +406,16 @@ class DQNAgent:
         self.__frameKeepCounter %= frameKeep
 
         return self.__lastAction
+
+
+    def stateReset(self):
+
+        """
+        Resets internal agent's state. This should be called between
+        subsequent games.
+        """
+
+        self.agentStateInitialized = False
 
 
 
@@ -425,17 +450,17 @@ class DQNAgent:
             # State target reward for the transition
             targetReward = rewards[i]
             if not dones[i]:
-                targetReward = rewards[i] + self.gammaPolicy(self.observationsSeen) * np.amax(self.__model(nextStates[i:i+1]).numpy()[0]) 
+                targetReward = rewards[i] + self.gammaPolicy(self.observationsSeen) * np.amax(self.model(nextStates[i:i+1]).numpy()[0]) 
 
             # Compute network's target
-            target = self.__model(states[i:i+1]).numpy()
+            target = self.model(states[i:i+1]).numpy()
             target[0][actions[i]] = targetReward
 
             # Save training sample
             self.trainingTargets[i] = target
 
         # Perform batch
-        return self.__model.fit(states, self.trainingTargets, batch_size=self.batchSize, epochs=1, **kwargs)
+        return self.model.fit(states, self.trainingTargets, batch_size=self.batchSize, epochs=1, **kwargs)
     
 
 
@@ -446,11 +471,11 @@ class DQNAgent:
         name : string, path to the file to save to
     """
     def load(self, name):
-        self.__model = keras.models.load_model(name)
+        self.model = keras.models.load_model(name)
 
     """
     Args:
         name : string, path to the file to load from    
     """
     def save(self, name):
-        self.__model.save(name)
+        self.model.save(name)
