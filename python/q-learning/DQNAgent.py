@@ -10,11 +10,8 @@ Description : DQN agent implementation based on the DeepMind-like DQN from:
 
 import numpy as np
 import random
-from collections import deque
 import tensorflow as tf
 from tensorflow import keras
-import random
-from utilities import static_vars
 
 class DQNAgent:
 
@@ -73,8 +70,6 @@ class DQNAgent:
             self.indices = np.empty(self.batchSize, dtype=np.int32)
 
 
-
-
         def store(self, action, reward, nextState, done):
 
             """
@@ -110,8 +105,6 @@ class DQNAgent:
             return self.states[idx - self.stackedStateLength + 1 : idx + 1, ...]
 
 
-
-
         def _getValidIndices(self):
 
             """
@@ -143,8 +136,6 @@ class DQNAgent:
 
                 # Save index to the pre-allocated array
                 self.indices[i] = index
-
-
 
 
         def getMiniBatch(self):
@@ -179,6 +170,8 @@ class DQNAgent:
             return self.trainingStates, self.actions[self.indices], self.rewards[self.indices], self.trainingNextStates, self.dones[self.indices]
 
 
+
+
     class ImagePreprocesor():
 
         """ Resizes and converts RGB (if RGB) images to grayscale """
@@ -195,9 +188,6 @@ class DQNAgent:
 
             self.imageShape = imageShape
             self.crop = crop
-
-
-
 
         def __call__(self, image):
 
@@ -220,7 +210,6 @@ class DQNAgent:
 
             # Resize image
             return tf.image.resize(image, self.imageShape, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-
 
 
 
@@ -324,7 +313,6 @@ class DQNAgent:
 
 
 
-
     def observe(self, action, reward, nextState, done):
         
         """
@@ -351,6 +339,7 @@ class DQNAgent:
 
         # Increment observation counter
         self.observationsSeen += 1
+
 
 
 
@@ -406,7 +395,6 @@ class DQNAgent:
 
 
 
-
     def learn(self, **kwargs):
 
 
@@ -449,6 +437,8 @@ class DQNAgent:
         # Perform batch
         return self.__model.fit(states, self.trainingTargets, batch_size=self.batchSize, epochs=1, **kwargs)
     
+
+
 
 
     """

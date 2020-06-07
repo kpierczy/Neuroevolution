@@ -1,0 +1,53 @@
+{
+    "computeDevice": -1,
+    "environment": "Breakout-ram-v0",
+    "paths": {
+        "modelsDir" : "python/q-learning/models",
+        "initialModelName" : false,
+        "finalModelName" : "Final"
+    },
+    "time": {
+        "maxFramesNum" : 500000,
+        "maxFramesPerGame" : 18000,
+        "evaluationFreq" : 30000 
+        
+    },
+    "agent": {
+        "replyMemorySize" : 1000000,
+        "frameKeep" : 3,
+        "stackStateLength" : 3,
+        "lostLifePenalty" : -2,
+        "epsilonPolicy" : "linear",
+        "epsilonPolicyConfig": {
+            "linear": {
+                "initial" : 1,
+                "initialPeriod" : 20000,
+                "firstTarget" : 0.1,
+                "firstTargetPeriod" : 180000,
+                "finalTarget" : 0.01,
+                "finalTargetPeriod" : 300000
+            },
+            "exponential": {
+                "initial" : 1,
+                "decay" : 0.0995
+            }
+        }
+    },
+    "model": {
+        "optimiser" : "Adam",
+        "lossFunction" : "mse",
+        "learningRate" : 25e-5,
+        "batchSize" : 32,
+        "layers" : [
+            {"type" : "flatten"},
+            {"type" : "dennse", "units" : 128, "activation" : "relu", "initialization" : "varianceScaling", "scale" : 2},
+            {"type" : "dennse", "units" : 128, "activation" : "relu", "initialization" : "varianceScaling", "scale" : 2}
+        ]
+    },
+    "log":{
+        "display" : false,
+        
+    }
+
+
+}

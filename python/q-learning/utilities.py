@@ -11,16 +11,16 @@ def static_vars(**kwargs):
 
     
 
-def linearEpsilon(frameNum, stableTime=50000, initial=1,
-                  firstMin=0.1, firstDecTime=950000,
-                  SecondMin=0.01, secondDecTime=100000):
+def linearEpsilon(frameNum,  initial=1, initialPeriod=50000,
+                  firstTarget=0.1, firstTargetPeriod=950000,
+                  finalTarget=0.01, finalTargetPeriod=100000):
 
     """
     Function manages epsilon value in a linear trend. Firstly,
     epsilon is hold at 'initial' for 'stableTime' frames. Next, it
-    linearly decreases to the 'firstMin' within 'firstDecTime'
-    frames. Finally it decreases to the 'secondMin' within
-    'secondDecTime' frames and at is hold at this value
+    linearly decreases to the 'firstTarget' within 'firstTargetPeriod'
+    frames. Finally it decreases to the 'finalTarget' within
+    'finalTargetPeriod' frames and at is hold at this value
     for all future calls
 
     Note:
@@ -30,15 +30,15 @@ def linearEpsilon(frameNum, stableTime=50000, initial=1,
     Args:
         frameNum : Integer, index of the actual frame
         initial : float, value of the epsilon for the 'stableTime'
-        stableTime : Integer, number of frames that epsilon is
+        initialPeriod : Integer, number of frames that epsilon is
             hold at 1
-        firstMin : value of the epsilon after the first linear
+        firstTarget : value of the epsilon after the first linear
             descend
-        firstDecTime : number of frames that 'firstMin' values
+        firstTargetPeriod : number of frames that 'firstTarget' values
             is reached within
-        secondMin : value of the epsilon after the second linear
+        finalTarget : value of the epsilon after the second linear
             descend
-        secondDecTime : number of frames that 'secondMin' values
+        finalTargetPeriod : number of frames that 'finalTarget' values
             is reached within
 
     Return:
@@ -46,14 +46,11 @@ def linearEpsilon(frameNum, stableTime=50000, initial=1,
 
     """
 
-    if frameNum < stableTime:
+    if frameNum < initialPeriod:
         return initial
-    elif frameNum < stableTime + firstDecTime:
-        return initial - (initial - firstMin) / firstDecTime * (frameNum - stableTime)
-    elif frameNum < stableTime + firstDecTime + secondDecTime:
-        return firstMin - (firstMin - SecondMin) / secondDecTime * (frameNum - stableTime - firstDecTime)
+    elif frameNum < initialPeriod + firstTargetPeriod:
+        return initial - (initial - firstTarget) / firstTargetPeriod * (frameNum - initialPeriod)
+    elif frameNum < initialPeriod + firstTargetPeriod + finalTargetPeriod:
+        return firstTarget - (firstTarget - finalTarget) / finalTargetPeriod * (frameNum - initialPeriod - firstTargetPeriod)
     else:
-        return secondDecTime
-
-
-
+        return finalTargetPeriod

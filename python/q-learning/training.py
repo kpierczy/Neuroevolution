@@ -1,10 +1,8 @@
 import os
-import sys
-from pathlib     import Path
-from collections import deque
-import tensorflow as tf
 import gym
-import numpy    as np
+import json
+import numpy as np
+import tensorflow as tf
 from tensorflow import keras
 from DQNAgent import DQNAgent
 from utilities import linearEpsilon
@@ -13,67 +11,87 @@ from utilities import linearEpsilon
 #---------------------------- Configuration -----------------------#
 #------------------------------------------------------------------#
 
-# GPU usage config (HIP for AMD; CUDA for Nvidia)(-1 for CPU; 0,1,... for GPUs)
-os.environ["HIP_VISIBLE_DEVICES"]  = "-1"
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-# Training environment
-env = gym.make('Breakout-ram-v0')
-# Directory for model's saves
-modelsDir = 'python/q-learning/models/'
-# Model to load (optional: False -> create new model)
-modelPath = False
-# Name of the final model save
-finalName = False
-
-# Number of games to play
-gamesNum = 10000
-# Maximum games length
-gamesLengthMax = 18000
-# Penalty for losings
-penalty = -2
-# Number of last episodes that an average score is computed from
-avgLen = 30
-# Score threshold for model's save
-threshold = 20
-
-# Policy for epsilon management
-epsilonPolicy = lambda frameNum : linearEpsilon(frameNum, stableTime=50000, initial=1,
-                                                 firstMin=0.1, firstDecTime=100000,
-                                                 SecondMin=0.01, secondDecTime=200000)
-
-# Agent's memory
-memSize = 1000000
-# Number of states that are stacked together to make agent's state
-stackedStateLength = 3
-
-# Learning data parameters
-batchSize  = 32
-# Learning features
-learningRate = 25e-5
-optimizer    = keras.optimizers.Adam(learning_rate=learningRate)
-loss         = 'mse'
-# Number of frames that action is hold stable
-frameKeep = 3
-
-# Model's stack
-inputs = keras.Input(shape=np.concatenate((np.array([stackedStateLength]), env.observation_space.shape), axis=0))
-layerStack = keras.layers.Flatten()(inputs)
-layerStack = keras.layers.Dense(128, activation='relu', kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))(layerStack)
-layerStack = keras.layers.Dense(128, activation='relu', kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))(layerStack)
-layerStack = keras.layers.Dense(env.action_space.n, activation='linear',
-                kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))(layerStack)
-
-# Display training simulations
-display = False 
+# Load configuration
+config = json.load('python/q-learning/trainingParams.json')
 
 
 #------------------------------------------------------------------#
 #--------------------------- Initialization -----------------------#
 #------------------------------------------------------------------#
 
+# GPU usage config (HIP for AMD; CUDA for Nvidia)(-1 for CPU; 0,1,... for GPUs)
+os.environ["HIP_VISIBLE_DEVICES"]  = config['computeDevices']
+os.environ["CUDA_VISIBLE_DEVICES"] = config['computeDevices']
+
+
+# Create training environment
+env = gym.make(config['environment'])
+
+
+# Policy for epsilon management
+epsilon = lambda frameNum : 0.5
+if config['agent']['epsilonPolicy'] == 'linear':
+    epsilonPolicy = lambda frameNum : linearEpsilon(frameNum, 
+            initial=config['agent']['epsilonPolicyConfig']['linear']['initial'],
+            initialPeriod=config['initialPeriod']['agent']['linear']['epsilonPolicyConfig'],
+            firstTarget=config['firstTarget']['agent']['linear']['epsilonPolicyConfig'],
+            firstTargetPeriod=config['firstTargetPeriod']['agent']['linear']['epsilonPolicyConfig'],
+            finalTarget=config['finalTarget']['agent']['linear']['epsilonPolicyConfig'],
+            finalTargetPeriod=config['finalTargetPeriod']['agent']['linear']['epsilonPolicyConfig'],
+        )
+elif config['agent']['epsilonPolicy'] == 'exponential':
+    epsilonPolicy = lambda frameNum : np.multiply(
+        config['agent']['epsilonPolicyConfig']['exponential']['initial'],
+        config['agent']['epsilonPolicyConfig']['exponential']['decay']**frameNum
+    )
+
+
+# Optimiser
+optimiser = keras.optimizers.Adam(learning_rate=config['model']['learningRate'])
+if config['model']['optimiser'] == 'SGD':
+    optimiser = keras.optimizers.SGD(learning_rate=config['model']['learningRate'])
+elif config['model']['optimiser'] == 'RMSprop':
+    optimiser = keras.optimizers.RMSprop(learning_rate=config['model']['learningRate'])
+elif config['model']['optimiser'] == 'Adadelta':
+    optimiser = keras.optimizers.Adadelta(learning_rate=config['model']['learningRate'])
+elif config['model']['optimiser'] == 'Adamax':
+    optimiser = keras.optimizers.Adamax(learning_rate=config['model']['learningRate'])
+elif config['model']['optimiser'] == 'Adagrad':
+    optimiser = keras.optimizers.Adagrad(learning_rate=config['model']['learningRate'])
+
+
+# Model's input
+layerStack = keras.Input(shape=np.concatenate((np.array([config['agent']['stackedStateLength']]), env.observation_space.shape), axis=0))
+# Model's stack
+for layer in config['model']['layers']:
+    # Dense layer
+    if layer['type'] == 'dense':
+
+        # Define initializer (one available at now)
+        if layer['initializer'] == 'varianceScaling':
+            initializer = keras.initializers.VarianceScaling(
+                scale=layer['scale']
+            )
+        # Stack layer
+        layerStack = keras.layers.Dense(
+            layer['units'], activation=layer['activation'],
+            kernel_initializer=layer['activation'],
+            initializer=initializer
+        )
+
+    # Flatten layer
+    elif layer['type'] == 'flatten':
+        layerStack = keras.layers.Flatten()
+        
+# Model's output
+layerStack = keras.layers.Dense(
+    env.action_space.n, activation='linear',
+    kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0)
+)(layerStack)
+
+
 # Initialize a new model
-if not modelPath:
+if not config['paths']['initialModelName']:
     agent = DQNAgent(
         inputs, layerStack, memSize=memSize, stackedStateLength=stackedStateLength,
         epsilonPolicy=epsilonPolicy, optimizer=optimizer, loss=loss, batchSize=batchSize
