@@ -2,11 +2,12 @@ import os
 import sys
 from pathlib     import Path
 from collections import deque
-
+import tensorflow as tf
 import gym
 import numpy    as np
 from tensorflow import keras
 from DQNAgent import DQNAgent
+from utilities import linearEpsilon
 
 #------------------------------------------------------------------#
 #---------------------------- Configuration -----------------------#
@@ -17,51 +18,54 @@ os.environ["HIP_VISIBLE_DEVICES"]  = "-1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Training environment
-env = gym.make('CartPole-v1')
+env = gym.make('Breakout-ram-v0')
 # Directory for model's saves
 modelsDir = 'python/q-learning/models/'
 # Model to load (optional: False -> create new model)
 modelPath = False
 # Name of the final model save
-finalName = 'python/q-learning/models/CartPole-v1/score_367.0'
+finalName = False
 
 # Number of games to play
-gamesNum = 1000
+gamesNum = 10000
 # Maximum games length
-gamesLengthMax = 5000
+gamesLengthMax = 18000
 # Penalty for losings
-penalty = -5
+penalty = -2
 # Number of last episodes that an average score is computed from
 avgLen = 30
 # Score threshold for model's save
-threshold = 250
+threshold = 20
 
 # Policy for epsilon management
-epsilonPolicy = lambda frameNum : 0.1*0.9995**frameNum
+epsilonPolicy = lambda frameNum : linearEpsilon(frameNum, stableTime=50000, initial=1,
+                                                 firstMin=0.1, firstDecTime=100000,
+                                                 SecondMin=0.01, secondDecTime=200000)
 
 # Agent's memory
-memSize = 10000
+memSize = 1000000
 # Number of states that are stacked together to make agent's state
-stackedStateLength = 1
+stackedStateLength = 3
 
 # Learning data parameters
 batchSize  = 32
 # Learning features
-learningRate = 1e-3
+learningRate = 25e-5
 optimizer    = keras.optimizers.Adam(learning_rate=learningRate)
 loss         = 'mse'
 # Number of frames that action is hold stable
-frameSkip = 1
+frameKeep = 3
 
 # Model's stack
 inputs = keras.Input(shape=np.concatenate((np.array([stackedStateLength]), env.observation_space.shape), axis=0))
 layerStack = keras.layers.Flatten()(inputs)
-layerStack = keras.layers.Dense(128, activation='relu')(layerStack)
-layerStack = keras.layers.Dense(128, activation='relu')(layerStack)
-layerStack = keras.layers.Dense(env.action_space.n, activation='linear')(layerStack)
+layerStack = keras.layers.Dense(128, activation='relu', kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))(layerStack)
+layerStack = keras.layers.Dense(128, activation='relu', kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))(layerStack)
+layerStack = keras.layers.Dense(env.action_space.n, activation='linear',
+                kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.0))(layerStack)
 
 # Display training simulations
-display = True
+display = False 
 
 
 #------------------------------------------------------------------#
@@ -102,7 +106,7 @@ for gameNum in range(gamesNum):
 
     # Play a game
     score = 0
-    frameSkipCounter = 0
+    lives = 0
     for _ in range(gamesLengthMax):
 
         # Display render
@@ -110,18 +114,20 @@ for gameNum in range(gamesNum):
             env.render()
 
         # Interact with environment
-        if frameSkipCounter == 0:
-            action = agent.act(np.repeat(state, stackedStateLength))
-        frameSkipCounter += 1
-        if frameSkipCounter == frameSkip + 1:
-            frameSkipCounter = 0
-        state, reward, done, _ = env.step(action)
+        action = agent.act(state, frameKeep=frameKeep)
+        state, reward, done, info = env.step(action)
 
-        # Assign penlaty if agent lost
-        reward = reward if not done else penalty
+        # Make agent treat each lost life as the episode's end
+        if info['ale.lives'] < lives:
+            liveLost = True
+        else:
+            liveLost = False
+
+        # Assign penlaty if agent a lostlife
+        reward = reward if not done else liveLost
 
         # Save interaction result to the history set
-        agent.observe(action, reward, state, done)
+        agent.observe(action, reward, state, liveLost)
 
         # Update score
         score += reward

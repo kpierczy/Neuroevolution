@@ -1,13 +1,17 @@
-# Decorator used to store C-like static variables
 def static_vars(**kwargs):
+
+    """ Decorator used to store C-like static variables """
+
     def decorate(func):
         for k in kwargs:
             setattr(func, k, kwargs[k])
         return func
     return decorate
 
-@static_vars(epsilon=1)
-def LinearEpsilon(frameNum, stableTime=50000, initial=1,
+
+    
+
+def linearEpsilon(frameNum, stableTime=50000, initial=1,
                   firstMin=0.1, firstDecTime=950000,
                   SecondMin=0.01, secondDecTime=100000):
 

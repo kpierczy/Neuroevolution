@@ -1,6 +1,6 @@
 """
    Filename : DQNAgent.cpp
-       Date : Sun June 06 2020
+       Date : Sat June 06 2020
      Author : Krzysztof Pierczyk
     Version : 1.0
 
@@ -8,13 +8,13 @@ Description : DQN agent implementation based on the DeepMind-like DQN from:
               https://github.com/fg91/Deep-Q-Learning/blob/master/DQN.ipynb
 """
 
-
 import numpy as np
 import random
 from collections import deque
 import tensorflow as tf
 from tensorflow import keras
 import random
+from utilities import static_vars
 
 class DQNAgent:
 
@@ -89,6 +89,7 @@ class DQNAgent:
 
             if nextState.shape != self.stateShape:
                 raise ValueError("State's dimension invalid")
+
             self.actions[self.current] = action
             self.states[self.current] = nextState
             self.rewards[self.current] = reward
@@ -193,7 +194,7 @@ class DQNAgent:
             """
 
             self.imageShape = imageShape
-            self.cropp = cropp
+            self.crop = crop
 
 
 
@@ -215,7 +216,7 @@ class DQNAgent:
                 image = tf.image.rgb_to_grayscale(image)
 
             # Perform cropping
-            image = tf.image.crop_to_bounding_box(image, crop[0][1], crop[0][0], crop[1][1], crop[1][0])
+            image = tf.image.crop_to_bounding_box(image, self.crop[0][1], self.crop[0][0], self.crop[1][1], self.crop[1][0])
 
             # Resize image
             return tf.image.resize(image, self.imageShape, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -227,8 +228,9 @@ class DQNAgent:
     def __init__(self, inputs, layerStack, stackedStateLength=4,
                  gammaPolicy=lambda frameNum : 0.95,
                  epsilonPolicy=lambda frameNum : 0.995**frameNum,
-                 optimizer='adam', loss='mse', batchSize=32,
-                 memSize=10000, stateDtype=np.float32, **kwargs):
+                 optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+                 loss='mse', batchSize=32, memSize=10000,
+                 stateDtype=np.float32, **kwargs):
 
         """
         Constructor. Initializes DQN agent with given parameters and structure
@@ -272,35 +274,46 @@ class DQNAgent:
         self.__model = keras.Model(inputs=inputs, outputs=layerStack)
         self.__model.compile(loss=loss, optimizer=optimizer, **compileKwargs)
 
-        # Get model's input's and output's shapes
-        stateShape = self.__model.input_shape[2:]
-        actionsNum = self.__model.output_shape[-1]
-
-        # Size of the net's input and output
-        if len(stateShape) in (2, 3):
+        # Define state's shape for image represented states ...
+        if len(self.__model.input_shape[2:]) in (2, 3):
             self.stateShape = kwargs.get('frameSize', np.array([84, 84]))
+        # ... or fo other states types
         else:
-            self.stateShape = stateShape
-        self.actionsNum = actionsNum
-        self.batchSize = batchSize
+            self.stateShape = self.__model.input_shape[2:]
+        # Define number of possible actions 
+        self.actionsNum = self.__model.output_shape[-1]
+        # Save number of subsequent states that are combined to make a single agent's state
         self.stackedStateLength = stackedStateLength
 
-        # Discount rate parameters
-        self.gammaPolicy = gammaPolicy
-
-        # Epsilon policy parameters
-        self.epsilonPolicy = epsilonPolicy
-        # Number of observations agent has seen
+        # Number of observations agent has made (observations are made only during training)
         self.observationsSeen = 0
 
-        # Internal replay memory
+        # Queue of the states received on actions (calling act(...) method)
+        self.agentStateInitialized = False
+        self.agentState = np.empty(np.concatenate((np.array([self.stackedStateLength]), self.stateShape), axis=0))
+
+        # Internal replay memory used to store observation
         self.replayMemory = self.ReplayMemory(
             self.stateShape, stackedStateLength=stackedStateLength,
             size=memSize, batchSize=batchSize, stateDtype=stateDtype
         )
 
+        # Action parameters
+        self.__lastAction = 0
+        self.__frameKeepCounter = 0
+
+        # Discount rate parameters
+        self.gammaPolicy = gammaPolicy
+        # Epsilon policy parameters
+        self.epsilonPolicy = epsilonPolicy
+        # Size of the  single training mini-batch
+        self.batchSize = batchSize
+        # Pre-allocate memory for the training targets
+        self.trainingTargets = np.empty((self.batchSize, self.actionsNum), dtype=stateDtype)
+
+
         # Optional image preprocessor
-        if len(stateShape) in (2,3):
+        if len(self.__model.input_shape[2:]) in (2,3):
             self.__imagePreprocesor = self.ImagePreprocesor(
                 imageShape=kwargs.get('imageShape', (84,84)),
                 crop=kwargs.get('crop', ((0, 34), (160, 160)))
@@ -308,8 +321,7 @@ class DQNAgent:
         else:
             self.__imagePreprocesor = None
 
-        # Pre-allocate memory for the training targets
-        self.trainingTargets = np.empty((self.batchSize, self.actionsNum), dtype=stateDtype)
+
 
 
 
@@ -342,26 +354,56 @@ class DQNAgent:
 
 
 
-    def act(self, state):
+    def act(self, state, frameKeep=1):
         
         """
         Returns action choosen for the given state
 
         Args:
             state : np.array, actual state
+            frameKeep : Integer, number of iterations that a single
+                action made by the agent should be preserved
 
         """    
 
-        # Decide to act randomly ...
-        if np.random.rand() <= self.epsilonPolicy(self.observationsSeen):
-            return random.randrange(self.actionsNum)
-        # ... or to follow model's deems
-        else:
+        # Keep frame value has to be positive
+        if frameKeep < 1:
+            raise ValueError("'frameKeep' factor has to be positive!")
 
-            # Evaluate model
-            return np.argmax(self.__model(
-                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0))
-            ).numpy()[0])
+        # Preprocess state if it's an image-type
+        if self.__imagePreprocesor is not None:
+            state = self.__imagePreprocesor(state)
+
+        # Initialize agent's state
+        if not self.agentStateInitialized:
+            self.agentState = np.repeat(
+                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0)),
+                self.stackedStateLength, axis=0
+            )
+        # Update state
+        else:
+            self.agentState[:-1] = self.agentState[1:]
+            self.agentState[-1] = state.reshape(np.concatenate((np.array([1]), state.shape), axis=0))
+
+        # Make action
+        if self.__frameKeepCounter == 0:
+            # Make random action with some probability
+            if np.random.rand() <= self.epsilonPolicy(self.observationsSeen):
+                self.__lastAction = random.randrange(self.actionsNum)
+            # Follow model's deems
+            else:
+                self.__lastAction = np.argmax(self.__model(
+                    self.agentState.reshape(
+                        np.concatenate((np.array([1]), self.agentState.shape), axis=0)
+                    )
+                ).numpy()[0])
+
+        self.__frameKeepCounter += 1
+        self.__frameKeepCounter %= frameKeep
+
+        return self.__lastAction
+
+
 
 
 
