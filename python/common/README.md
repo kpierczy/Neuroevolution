@@ -1,6 +1,6 @@
 # Description of the configuration parameters required by the session()
 {
-    "environment" : "Gym ID of the used environment",
+    "env" : "Gym ID of the used environment",
     "time" : {
         "maxFramesNum" : "maximum number of games' iterations (i.e. env.step() calls)",
         "maxFramesPerGame" : "maximum number of the single game's iterations",
@@ -22,6 +22,14 @@
         "meanTrainingScoreLength" : "number of recent games that mean training score is calculated on",
         "verboseLearning" : "if true, keras.Model.fit() is called with the verbose=1",
         "trainingLogUpdateFreq" : "number of training games between updating Tensorboard"
+    },
+    "environment" : {
+        "evaluationRandomStart" : "maximum number of random actions taken at the each evaluation game",
+        "evaluationRandomStartAction" : "identifier of the action to be performed at the begining of the evaluation game",
+        "infoAsDone" : "In some games (e.g. Breakout) single game consists of single episodes. If this parameters is set
+                        to false, game is considered 'done' when 'done' returned from env.step() is True. This field can
+                        be set to the key-string that determines field of the 'info' dictionary that servers this way
+                        instead (e.g. you can consider lost of the each life as a terminal state)"
     }
 }
 

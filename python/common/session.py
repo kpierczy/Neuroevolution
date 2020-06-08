@@ -1,12 +1,13 @@
 import os
+import random
 import numpy as np
 import tensorflow as tf
 
 """
    Filename : session.cpp
-       Date : San June 07 2020
+       Date : Mon June 08 2020
      Author : Krzysztof Pierczyk
-    Version : 1.0
+    Version : 1.1
 
 Description : Simple framework desired to train an arbitrary RL algorithm with
               saves automatisation and Tensorboard management
@@ -80,7 +81,7 @@ def session(env, config, agent, save):
     print("=================================================================")
     print("|                         Training session                      |")
     print("=================================================================")
-    print("Environment: {}                                                  ".format(config['environment']))
+    print("Environment: {}                                                  ".format(config['env']))
     print("                                                                 ")
     print("Available actions: {}                                            ".format(env.unwrapped.get_action_meanings()))
     agent.model.summary()
@@ -137,13 +138,16 @@ def session(env, config, agent, save):
                             reward = -1
 
                     # Make agent treat each lost life as the episode's end
-                    if info['ale.lives'] < lives:
-                        liveLost = True
+                    if config['environment']['infoAsDone'] != False:
+                        if info[config['environment']['infoAsDone']]:
+                            episodeTerminated = True
+                        else: 
+                            episodeTerminated = False
                     else:
-                        liveLost = False
+                        episodeTerminated = done
 
                     # Save interaction result to the history set
-                    agent.observe(action, reward, state, liveLost)
+                    agent.observe(action, reward, state, episodeTerminated)
 
                     # Teach model
                     if framesNum > config['agent']['initialRandomFrames'] and \
@@ -183,14 +187,21 @@ def session(env, config, agent, save):
             # Initialize statistics containers
             evaluationRewards = []
 
-            for _ in range(config['time']['evaluationGames']):
+            gamesLeft = config['time']['evaluationGames']
+            while gamesLeft > 0:
 
                 # Reset environment
                 agent.stateReset()
                 state = env.reset()
                 episodeReward = 0
 
-                for i in range(config['time']['maxFramesPerGame']):
+                # Perform initial random actions
+                for _ in range(random.randrange(1, config['environment']['evaluationRandomStart'])):
+                    if config['log']['displayEval']:
+                        env.render()
+                    state, _, _, _ = env.step(config['environment']['evaluationRandomStartAction'])
+                    
+                for _ in range(config['time']['maxFramesPerGame']):
 
                     # Display render
                     if config['log']['displayEval']:
@@ -198,22 +209,32 @@ def session(env, config, agent, save):
 
                     # Interact with environment
                     action = agent.act(state, evaluation=True, frameKeep=config['agent']['evaluationFrameKeep'])
-                    state, _, done, _ = env.step(action)
+                    state, reward, done, info = env.step(action)
                     episodeReward += reward
 
                     # End of the game
                     if done:
+                        gamesLeft -= 1
                         break
 
-            # Save reward
-            evaluationRewards.append(episodeReward)
+                    # Modified terminal state
+                    if config['environment']['infoAsDone'] != False:
+                        if info[config['environment']['infoAsDone']]:
+                            for _ in range(random.randrange(1, config['environment']['evaluationRandomStart'])):
+                                if config['log']['displayEval']:
+                                    env.render()
+                                state, _, _, _ = env.step(config['environment']['evaluationRandomStartAction'])
+                            continue
+
+                # Save reward
+                evaluationRewards.append(episodeReward)
 
             # Update training stats on the Tensorboard
             with summaryWriter.as_default():
-                tf.summary.scalar('evaluation_score', np.mean(evaluationRewards[-config['time']['evaluationGames']:]), framesNum)
+                tf.summary.scalar('evaluation_score', np.mean(evaluationRewards), framesNum)
 
             # Evaluation summary
-            avgEvalReward = np.mean(evaluationRewards[-config['time']['evaluationGames']:])
+            avgEvalReward = np.mean(evaluationRewards)
             print("\n")
             print("=================================================")
             print("| Average evaluation score: {}                  |".format(avgEvalReward))

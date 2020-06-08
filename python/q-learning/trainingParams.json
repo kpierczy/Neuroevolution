@@ -1,40 +1,45 @@
 {
     "computeDevices": "-1",
-    "environment": "Breakout-ram-v0",
+    "env": "Breakout-ramDeterministic-v0",
     "paths": {
         "savesDir" : "python/q-learning/saves",
         "initialModelName" : false,
         "initialReplayMemoryName" : false
     },
     "time": {
-        "maxFramesNum" : 500000,
-        "maxFramesPerGame" : 1800,
+        "maxFramesNum" : 1000000,
+        "maxFramesPerGame" : 9000,
         "learningFrequency" : 4,
-        "evaluationFreq" : 10000 ,
+        "evaluationFreq" : 20000 ,
         "evaluationGames" : 5
     },
     "agent": {
         "replayMemorySize" : 1000000,
-        "initialRandomFrames" : 20000,
+        "initialRandomFrames" : 40000,
         "clipReward" : true,
-        "trainingFrameKeep" : 3,
+        "trainingFrameKeep" : 1,
         "evaluationFrameKeep" : 1,
         "stackedStateLength" : 1,
         "epsilonPolicy" : "linear",
         "epsilonPolicyConfig": {
             "linear": {
                 "initial" : 1,
-                "initialPeriod" : 20000,
+                "initialPeriod" : 40000,
                 "firstTarget" : 0.1,
-                "firstTargetPeriod" : 180000,
+                "firstTargetPeriod" : 360000,
                 "finalTarget" : 0.01,
-                "finalTargetPeriod" : 300000
+                "finalTargetPeriod" : 400000
             },
             "exponential": {
                 "initial" : 1,
                 "decay" : 0.0995
             }
         }
+    },
+    "environment" : {
+        "evaluationRandomStart" : 10,
+        "evaluationRandomStartAction" : 1,
+        "infoAsDone" : "lifeLost"
     },
     "model": {
         "optimizer" : "Adam",
@@ -50,7 +55,7 @@
     },
     "log":{
         "directory" : "python/q-learning/logs",
-        "logID" : "run_1",
+        "logID" : "Night_run_1",
         "display" : true,
         "displayEval" : true,
         "meanTrainingScoreLength" : 100,

@@ -11,6 +11,7 @@ from tensorflow import keras
 from DQNAgent import DQNAgent
 from utilities import linearEpsilon, save
 from common.session import session
+from BreakoutEnv import BreakoutEnv
 
 
 #===================================================================================#
@@ -30,7 +31,7 @@ os.environ["HIP_VISIBLE_DEVICES"]  = config['computeDevices']
 os.environ["CUDA_VISIBLE_DEVICES"] = config['computeDevices']
 
 # Create training environment
-env = gym.make(config['environment'])
+env = BreakoutEnv(config['env'])
 
 # Create folders for the models and memory stamps
 savesDir = os.path.join(config['paths']['savesDir'], env.unwrapped.spec.id)
