@@ -486,10 +486,10 @@ class DQNAgent:
             mmemoryPath : string, path to the folder to load replay memory from
         """
 
-        self.replayMemory.actions = np.load(os.path.join(memoryPath, 'actions'))
-        self.replayMemory.dones = np.load(os.path.join(memoryPath, 'dones'))
-        self.replayMemory.rewards = np.load(os.path.join(memoryPath, 'rewards'))
-        self.replayMemory.states = np.load(os.path.join(memoryPath, 'states'))
+        self.replayMemory.actions = np.load(os.path.join(memoryPath, 'actions.npy'))
+        self.replayMemory.dones = np.load(os.path.join(memoryPath, 'dones.npy'))
+        self.replayMemory.rewards = np.load(os.path.join(memoryPath, 'rewards.npy'))
+        self.replayMemory.states = np.load(os.path.join(memoryPath, 'states.npy'))
 
 
     def saveModel(self, modelPath):

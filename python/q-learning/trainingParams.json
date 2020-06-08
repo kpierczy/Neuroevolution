@@ -1,6 +1,7 @@
 {
     "computeDevices": "-1",
     "env": "Breakout-ramDeterministic-v0",
+    "mode": "training",
     "paths": {
         "savesDir" : "python/q-learning/saves",
         "initialModelName" : false,
@@ -39,7 +40,8 @@
     "environment" : {
         "evaluationRandomStart" : 10,
         "evaluationRandomStartAction" : 1,
-        "infoAsDone" : "lifeLost"
+        "infoAsDone" : "lifeLost",
+        "envaluationSlowDown" : 30
     },
     "model": {
         "optimizer" : "Adam",
@@ -55,8 +57,8 @@
     },
     "log":{
         "directory" : "python/q-learning/logs",
-        "logID" : "Night_run_1",
-        "display" : true,
+        "logID" : "Morning_run_1",
+        "display" : false,
         "displayEval" : true,
         "meanTrainingScoreLength" : 100,
         "verboseLearning" : false,

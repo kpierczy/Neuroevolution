@@ -30,8 +30,28 @@
                         to false, game is considered 'done' when 'done' returned from env.step() is True. This field can
                         be set to the key-string that determines field of the 'info' dictionary that servers this way
                         instead (e.g. you can consider lost of the each life as a terminal state)"
+        "envaluationSlowDown" : "Evaluation frame-time. If false, no frame rate limit applied"
     }
 }
 
 # Tensorboard
 When session() method is called, the tensorboard host can be activated with tensorboard --logdir="directory/logID"
+
+
+# Description of the configuration parameters required by the evaluation()
+{
+    "env" : "Gym ID of the used environment",
+    "time" : {
+        "maxFramesPerGame" : "maximum number of the single game's iterations",
+    },
+    "agent" : {
+        "evaluationFrameKeep" : "number of frames that agent holds action unchanged (at evaluation)"
+    },
+    "environment" : {
+        "infoAsDone" : "In some games (e.g. Breakout) single game consists of single episodes. If this parameters is set
+                        to false, game is considered 'done' when 'done' returned from env.step() is True. This field can
+                        be set to the key-string that determines field of the 'info' dictionary that servers this way
+                        instead (e.g. you can consider lost of the each life as a terminal state)"
+        "envaluationSlowDown" : "Evaluation frame-time. If false, no frame rate limit applied"
+    }
+}

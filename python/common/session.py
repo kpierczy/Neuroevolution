@@ -1,4 +1,5 @@
 import os
+import time
 import random
 import numpy as np
 import tensorflow as tf
@@ -198,6 +199,8 @@ def session(env, config, agent, save):
                 # Perform initial random actions
                 for _ in range(random.randrange(1, config['environment']['evaluationRandomStart'])):
                     if config['log']['displayEval']:
+                        if config['environment']['envaluationSlowDown'] != False:
+                            time.sleep(1 / config['environment']['envaluationSlowDown'])
                         env.render()
                     state, _, _, _ = env.step(config['environment']['evaluationRandomStartAction'])
                     
@@ -222,6 +225,8 @@ def session(env, config, agent, save):
                         if info[config['environment']['infoAsDone']]:
                             for _ in range(random.randrange(1, config['environment']['evaluationRandomStart'])):
                                 if config['log']['displayEval']:
+                                    if config['environment']['envaluationSlowDown'] != False:
+                                        time.sleep(1 / config['environment']['envaluationSlowDown'])
                                     env.render()
                                 state, _, _, _ = env.step(config['environment']['evaluationRandomStartAction'])
                             continue

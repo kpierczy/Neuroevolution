@@ -1,6 +1,7 @@
 # Descrption of the parameters specific to DQN (for base parameters, @see python/common/README.md)
 {
     "computeDevices": "ID of the devices used for computation. "-1" for CPU, "0, 1, ..." for GPU ",
+    "mode": "Mode of the next run ('avaluation' or 'training)"
     "paths": {
         "savesDir" : "path to the directory storing models and memory stamps",
         "initialModelName" : "name of the model save to load before training (it is supposed to be

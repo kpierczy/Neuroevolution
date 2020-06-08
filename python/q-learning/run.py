@@ -11,6 +11,7 @@ from tensorflow import keras
 from DQNAgent import DQNAgent
 from utilities import linearEpsilon, save
 from common.session import session
+from common.evaluation import evaluation
 from BreakoutEnv import BreakoutEnv
 
 
@@ -105,19 +106,15 @@ layerStack = keras.layers.Dense(
 
 
 # Initialize a new model
-if not config['paths']['initialModelName']:
-    agent = DQNAgent(
-        inputs, layerStack, memSize=config['agent']['initialRandomFrames'],
-        stackedStateLength=config['agent']['stackedStateLength'],
-        epsilonPolicy=epsilonPolicy, optimizer=optimizer,
-        loss=config['model']['lossFunction'], batchSize=config['model']['batchSize'],
-        modelName=config['model']['name']
-    )
-# Or load the old one for futher learning
-else:
-    agent = DQNAgent(
-        env.observation_space.shape, env.action_space.n, layerStack
-    )
+agent = DQNAgent(
+    inputs, layerStack, memSize=config['agent']['replayMemorySize'],
+    stackedStateLength=config['agent']['stackedStateLength'],
+    epsilonPolicy=epsilonPolicy, optimizer=optimizer,
+    loss=config['model']['lossFunction'], batchSize=config['model']['batchSize'],
+    modelName=config['model']['name']
+)
+# If required load the old model for futher learning
+if config['paths']['initialModelName'] != False:
     modelToLoad = os.path.join(
         config['paths']['savesDir'],
         env.unwrapped.spec.id,
@@ -140,4 +137,7 @@ if config['paths']['initialReplayMemoryName'] != False:
 #====================================== Training ===================================#
 #===================================================================================#
 
-session(env, config, agent, lambda name : save(name, savesDir, agent))
+if config['mode'] == 'training':
+    session(env, config, agent, lambda name : save(name, savesDir, agent))
+elif config['mode'] == 'evaluation':
+    evaluation(env, config, agent)
