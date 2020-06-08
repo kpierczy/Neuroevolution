@@ -15,6 +15,7 @@
                                   game transitions that are gathered in the replay memory before agent starts
                                   learning)",
         "stackedStateLength" : "number of subsequent frames that are stacked to create an agent's state",
+        "stateScaleFactor" : "coefficient that input state is normalized by before feeding the network",
         "epsilonPolicy" : "name of the policy for epsilon management ('linear' or 'exponential')",
         "epsilonPolicyConfig": {
             "linear": {

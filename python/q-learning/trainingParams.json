@@ -5,7 +5,7 @@
     "paths": {
         "savesDir" : "python/q-learning/saves",
         "initialModelName" : false,
-        "initialReplayMemoryName" : false
+        "initialReplayMemoryName" : "avg_eval_9.4"
     },
     "time": {
         "maxFramesNum" : 1000000,
@@ -21,6 +21,7 @@
         "trainingFrameKeep" : 1,
         "evaluationFrameKeep" : 1,
         "stackedStateLength" : 1,
+        "stateScaleFactor" : 255,
         "epsilonPolicy" : "linear",
         "epsilonPolicyConfig": {
             "linear": {
@@ -41,7 +42,7 @@
         "evaluationRandomStart" : 10,
         "evaluationRandomStartAction" : 1,
         "infoAsDone" : "lifeLost",
-        "envaluationSlowDown" : 30
+        "envaluationSlowDown" : false
     },
     "model": {
         "optimizer" : "Adam",
@@ -57,13 +58,11 @@
     },
     "log":{
         "directory" : "python/q-learning/logs",
-        "logID" : "Morning_run_1",
+        "logID" : "Midday_run_1",
         "display" : false,
-        "displayEval" : true,
+        "displayEval" : false,
         "meanTrainingScoreLength" : 100,
         "verboseLearning" : false,
         "trainingLogUpdateFreq" : 10
     }
-
-
 }

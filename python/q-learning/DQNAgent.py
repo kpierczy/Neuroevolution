@@ -216,7 +216,7 @@ class DQNAgent:
 
 
     def __init__(self, inputs, layerStack, stackedStateLength=4,
-                 gammaPolicy=lambda frameNum : 0.95,
+                 stateScaleFactor=255, gammaPolicy=lambda frameNum : 0.95,
                  epsilonPolicy=lambda frameNum : 0.995**frameNum,
                  optimizer=keras.optimizers.Adam(learning_rate=1e-3),
                  loss='mse', batchSize=32, memSize=10000,
@@ -231,6 +231,7 @@ class DQNAgent:
             input and layers constitutig the model
             stackedStateLength : Integer, number of subsequent observed states
                 that is combined to obtain agent's state
+            stateScaleFactor : Integer, the factor that the input states are divided by
             gammaPolicy : function handle, discount rate policy, function that
                 takes one Integer argument (frame's number) and returns appropriate
                 discount rate
@@ -274,6 +275,8 @@ class DQNAgent:
         self.actionsNum = self.model.output_shape[-1]
         # Save number of subsequent states that are combined to make a single agent's state
         self.stackedStateLength = stackedStateLength
+        # the factor that the input states are divided by
+        self.stateScaleFactor = stateScaleFactor
 
         # Number of observations agent has made (observations are made only during training)
         self.observationsSeen = 0
@@ -336,7 +339,7 @@ class DQNAgent:
             nextState = self.__imagePreprocesor(nextState)
 
         # Store observation
-        self.replayMemory.store(action, reward, nextState, done )
+        self.replayMemory.store(action, reward, nextState / self.stateScaleFactor, done )
 
         # Increment observation counter
         self.observationsSeen += 1
@@ -369,14 +372,14 @@ class DQNAgent:
         # Initialize agent's state
         if not self.agentStateInitialized:
             self.agentState = np.repeat(
-                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0)),
+                state.reshape(np.concatenate((np.array([1]), state.shape), axis=0)) / self.stateScaleFactor,
                 self.stackedStateLength, axis=0
             )
             self.agentStateInitialized = True
         # Update state
         else:
             self.agentState[:-1] = self.agentState[1:]
-            self.agentState[-1] = state.reshape(np.concatenate((np.array([1]), state.shape), axis=0))
+            self.agentState[-1] = state.reshape(np.concatenate((np.array([1]), state.shape), axis=0)) / self.stateScaleFactor
 
         # Make action
         if self.__frameKeepCounter == 0:

@@ -108,7 +108,8 @@ layerStack = keras.layers.Dense(
 # Initialize a new model
 agent = DQNAgent(
     inputs, layerStack, memSize=config['agent']['replayMemorySize'],
-    stackedStateLength=config['agent']['stackedStateLength'],
+    stackedStateLength=config['agent']['stackedStateLength'], 
+    stateScaleFactor=config['agent']['stateScaleFactor'],
     epsilonPolicy=epsilonPolicy, optimizer=optimizer,
     loss=config['model']['lossFunction'], batchSize=config['model']['batchSize'],
     modelName=config['model']['name']
