@@ -1,15 +1,15 @@
 {
     "computeDevices": "-1",
     "env": "Breakout-ramDeterministic-v0",
-    "mode": "evaluation",
+    "mode": "training",
     "paths": {
         "savesDir" : "python/q-learning/saves",
-        "initialModelName" : "avg_eval_35.06666666666667",
-        "initialReplayMemoryName" : false
+        "initialModelName" : "avg_eval_5.8e+01",
+        "initialReplayMemoryName" : "avg_eval_5.8e+01"
     },
     "time": {
         "maxFramesNum" : 1500000,
-        "maxFramesPerGame" : 18000,
+        "maxFramesPerGame" : 27000,
         "learningFrequency" : 4,
         "evaluationFreq" : 30000,
         "evaluationGames" : 30
@@ -58,7 +58,7 @@
     },
     "log":{
         "directory" : "python/q-learning/logs",
-        "logID" : "Night_run_1",
+        "logID" : "Morning_run_2",
         "display" : false,
         "displayEval" : true,
         "meanTrainingScoreLength" : 100,
