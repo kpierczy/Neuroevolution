@@ -6,6 +6,10 @@
 
 Description : DQN agent implementation based on the DeepMind-like DQN from:
               https://github.com/fg91/Deep-Q-Learning/blob/master/DQN.ipynb
+
+TO DO list:
+     - full save & load mechanism (internal parameters)
+     - DQN-based NEAT class
 """
 
 import os

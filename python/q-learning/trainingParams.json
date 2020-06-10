@@ -1,23 +1,23 @@
 {
     "computeDevices": "-1",
     "env": "Breakout-ramDeterministic-v0",
-    "mode": "training",
+    "mode": "evaluation",
     "paths": {
         "savesDir" : "python/q-learning/saves",
-        "initialModelName" : false,
-        "initialReplayMemoryName" : "avg_eval_9.4"
+        "initialModelName" : "avg_eval_35.06666666666667",
+        "initialReplayMemoryName" : false
     },
     "time": {
-        "maxFramesNum" : 1000000,
-        "maxFramesPerGame" : 9000,
+        "maxFramesNum" : 1500000,
+        "maxFramesPerGame" : 18000,
         "learningFrequency" : 4,
-        "evaluationFreq" : 20000 ,
-        "evaluationGames" : 5
+        "evaluationFreq" : 30000,
+        "evaluationGames" : 30
     },
     "agent": {
-        "replayMemorySize" : 1000000,
-        "initialRandomFrames" : 40000,
-        "clipReward" : true,
+        "replayMemorySize" : 100000,
+        "initialRandomFrames" : 50000,
+        "clipReward" : false,
         "trainingFrameKeep" : 1,
         "evaluationFrameKeep" : 1,
         "stackedStateLength" : 1,
@@ -26,11 +26,11 @@
         "epsilonPolicyConfig": {
             "linear": {
                 "initial" : 1,
-                "initialPeriod" : 40000,
+                "initialPeriod" : 50000,
                 "firstTarget" : 0.1,
-                "firstTargetPeriod" : 360000,
+                "firstTargetPeriod" : 750000,
                 "finalTarget" : 0.01,
-                "finalTargetPeriod" : 400000
+                "finalTargetPeriod" : 1500000
             },
             "exponential": {
                 "initial" : 1,
@@ -42,7 +42,7 @@
         "evaluationRandomStart" : 10,
         "evaluationRandomStartAction" : 1,
         "infoAsDone" : "lifeLost",
-        "envaluationSlowDown" : false
+        "envaluationSlowDown" : 30
     },
     "model": {
         "optimizer" : "Adam",
@@ -58,9 +58,9 @@
     },
     "log":{
         "directory" : "python/q-learning/logs",
-        "logID" : "Midday_run_1",
+        "logID" : "Night_run_1",
         "display" : false,
-        "displayEval" : false,
+        "displayEval" : true,
         "meanTrainingScoreLength" : 100,
         "verboseLearning" : false,
         "trainingLogUpdateFreq" : 10

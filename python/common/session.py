@@ -247,7 +247,7 @@ def session(env, config, agent, save):
             print("\n")
 
             # Save model
-            save('avg_eval_{}'.format(avgEvalReward))
+            save('avg_eval_{:.2}'.format(avgEvalReward))
 
 
     #--------------------------------------------------------#
@@ -257,5 +257,5 @@ def session(env, config, agent, save):
     finally:
 
         # Save model
-        save('interrupted_avg_eval_{}'.format(avgEvalReward))
+        save('interrupted_avg_eval_{:.2}'.format(avgEvalReward))
 
