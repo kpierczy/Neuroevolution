@@ -1,11 +1,11 @@
 {
     "computeDevices": "-1",
     "env": "Breakout-ramDeterministic-v0",
-    "mode": "training",
+    "mode": "evaluation",
     "paths": {
         "savesDir" : "python/q-learning/saves",
-        "initialModelName" : "avg_eval_5.8e+01",
-        "initialReplayMemoryName" : "avg_eval_5.8e+01"
+        "initialModelName" : "avg_eval_54",
+        "initialReplayMemoryName" : false
     },
     "time": {
         "maxFramesNum" : 1500000,
